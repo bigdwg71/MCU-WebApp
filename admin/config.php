@@ -1,9 +1,15 @@
 <?php
-//Chris Settings
+//Kimmel Settings
 $db_hostname = 'localhost';
 $db_username = 'root';
-$db_password = 'C1sc0123';
+$db_password = 'j1mmyk1mm3l';
 $db_database = 'mcuDB5';
+
+//Chris Settings
+//$db_hostname = 'localhost';
+//$db_username = 'root';
+//$db_password = 'C1sc0123';
+//$db_database = 'mcuDB4085';
 
 //Peter Settings
 //$db_hostname = 'localhost';
