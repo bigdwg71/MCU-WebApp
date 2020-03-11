@@ -5,250 +5,22 @@ var participantList;
 var conferenceList;
 var waitingRoom = "";
 var showIsLive;
+var refreshWebTimer;
+var writeConferenceTimer;
+var writeParticipantTimer;
+var writePanesDBTimer;
 
 //Create variables that we need to survive automatic refreshes and button clicks
-var refreshInterval;
+var refreshWebInterval, writeConferenceInterval, writeParticipantInterval, writePanesDBInterval;
 var timeout = null;
 var lastRefresh = 0;
-var currentTime = new Date().getTime();
+//var currentTime = new Date().getTime();
 //var showSetup = false;
 var conferenceTotal;
 var conferenceImportant = false;
 var checkContent = [];
 var openModalId = "";
 checkContent[0] = "";
-
-function panePlacementDropdowns(panePlacement, conferenceName, conferenceId, displayName) {
-    'use strict';
-    var i;
-    $.each(panePlacement.panes, function (panesArrayInnerKey, panesArrayInnerValue) {
-        if (panesArrayInnerValue.type === 'default') {
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .find('option')
-                .remove()
-                .end()
-                .append($("<option></option>")
-                    .attr("value", 0)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "default")
-                    .text("Default")
-                    .prop('selected', true));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 1)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "blank")
-                    .text("Blank"));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 2)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "loudest")
-                    .text("Loudest"));
-            i = 3;
-            $.each(participantList, function (participantListInnerKey, participantListInnerValue) {
-                if (participantListInnerValue.conferenceName === conferenceName) {
-                    if (participantListInnerValue.displayName === "_") {
-                        displayName = "Loop";
-                    } else if (participantListInnerValue.displayName === "__") {
-                        displayName = "Show Feed";
-                    } else {
-                        displayName = participantListInnerValue.displayName;
-                    }
-                    $("#select" + conferenceId + panesArrayInnerKey)
-                        .append($("<option></option>")
-                            .attr("value", i)
-                            .attr("data-conf", conferenceName)
-                            .attr("data-panenumber", panesArrayInnerKey)
-                            .attr("data-type", "participant")
-                            .attr("data-participantType", participantListInnerValue.participantType)
-                            .attr("data-participantProtocol", participantListInnerValue.participantProtocol)
-                            .attr("data-participantName", participantListInnerValue.participantName)
-                            .text(displayName));
-                    i = i + 1;
-                }
-            });
-
-        } else if (panesArrayInnerValue.type === 'blank') {
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .find('option')
-                .remove()
-                .end()
-                .append($("<option></option>")
-                    .attr("value", 0)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "default")
-                    .text("Default"));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 1)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "blank")
-                    .text("Blank")
-                    .prop('selected', true));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 2)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "loudest")
-                    .text("Loudest"));
-            i = 3;
-            $.each(participantList, function (participantListInnerKey, participantListInnerValue) {
-                if (participantListInnerValue.conferenceName === conferenceName) {
-                    if (participantListInnerValue.displayName === "_") {
-                        displayName = "Loop";
-                    } else if (participantListInnerValue.displayName === "__") {
-                        displayName = "Show Feed";
-                    } else {
-                        displayName = participantListInnerValue.displayName;
-                    }
-                    $("#select" + conferenceId + panesArrayInnerKey)
-                        .append($("<option></option>")
-                            .attr("value", i)
-                            .attr("data-conf", conferenceName)
-                            .attr("data-panenumber", panesArrayInnerKey)
-                            .attr("data-type", "participant")
-                            .attr("data-participantType", participantListInnerValue.participantType)
-                            .attr("data-participantProtocol", participantListInnerValue.participantProtocol)
-                            .attr("data-participantName", participantListInnerValue.participantName)
-                            .text(displayName));
-                    i = i + 1;
-                }
-            });
-
-        } else if (panesArrayInnerValue.type === 'loudest') {
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .find('option')
-                .remove()
-                .end()
-                .append($("<option></option>")
-                    .attr("value", 0)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "default")
-                    .text("Default"));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 1)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "blank")
-                    .text("Blank"));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 2)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "loudest")
-                    .text("Loudest")
-                    .prop('selected', true));
-            i = 3;
-            $.each(participantList, function (participantListInnerKey, participantListInnerValue) {
-                if (participantListInnerValue.conferenceName === conferenceName) {
-                    if (participantListInnerValue.displayName === "_") {
-                        displayName = "Loop";
-                    } else if (participantListInnerValue.displayName === "__") {
-                        displayName = "Show Feed";
-                    } else {
-                        displayName = participantListInnerValue.displayName;
-                    }
-                    $("#select" + conferenceId + panesArrayInnerKey)
-                        .append($("<option></option>")
-                            .attr("value", i)
-                            .attr("data-conf", conferenceName)
-                            .attr("data-panenumber", panesArrayInnerKey)
-                            .attr("data-type", "participant")
-                            .attr("data-participantType", participantListInnerValue.participantType)
-                            .attr("data-participantProtocol", participantListInnerValue.participantProtocol)
-                            .attr("data-participantName", participantListInnerValue.participantName)
-                            .text(displayName));
-                    i = i + 1;
-                }
-            });
-
-        } else if (panesArrayInnerValue.type === 'participant') {
-            $.each(participantList, function (participantListInnerKey, participantListInnerValue) {
-                if (participantListInnerValue.participantName === panesArrayInnerValue.participantName) {
-                    if (participantListInnerValue.displayName === "_") {
-                        displayName = "Loop";
-                    } else if (participantListInnerValue.displayName === "__") {
-                        displayName = "Show Feed";
-                    } else {
-                        displayName = participantListInnerValue.displayName;
-                    }
-                }
-            });
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .find('option')
-                .remove()
-                .end()
-                .append($("<option></option>")
-                    .attr("value", 0)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "default")
-                    .text("Default"));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 2)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "blank")
-                    .text("Blank"));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 3)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "loudest")
-                    .text("Loudest"));
-            $("#select" + conferenceId + panesArrayInnerKey)
-                .append($("<option></option>")
-                    .attr("value", 4)
-                    .attr("data-conf", conferenceName)
-                    .attr("data-panenumber", panesArrayInnerKey)
-                    .attr("data-type", "participant")
-                    .attr("data-participanttype", panesArrayInnerValue.participantType)
-                    .attr("data-participantprotocol", panesArrayInnerValue.participantProtocol)
-                    .attr("data-participantname", panesArrayInnerValue.participantName)
-                    .text(displayName)
-                    .prop('selected', true));
-            i = 5;
-            $.each(participantList, function (participantListInnerKey, participantListInnerValue) {
-                if (participantListInnerValue.conferenceName === conferenceName && participantListInnerValue.participantName !== panesArrayInnerValue.participantName) {
-                    if (participantListInnerValue.displayName === "_") {
-                        displayName = "Loop";
-                    } else if (participantListInnerValue.displayName === "__") {
-                        displayName = "Show Feed";
-                    } else {
-                        displayName = participantListInnerValue.displayName;
-                    }
-                    $("#select" + conferenceId + panesArrayInnerKey)
-                        .append($("<option></option>")
-                            .attr("value", i)
-                            .attr("data-conf", conferenceName)
-                            .attr("data-panenumber", panesArrayInnerKey)
-                            .attr("data-type", "participant")
-                            .attr("data-participantType", participantListInnerValue.participantType)
-                            .attr("data-participantProtocol", participantListInnerValue.participantProtocol)
-                            .attr("data-participantName", participantListInnerValue.participantName)
-                            .text(displayName));
-                    i = i + 1;
-                }
-            });
-        }
-    });
-}
-
-$('head').append('<link rel="stylesheet" href="css/base.css" type="text/css" />');
-var refreshTimer = 800;
-var refreshPreview = 10000;
 
 function layoutsDialog(dialogId) {
     "use strict";
@@ -258,31 +30,31 @@ function layoutsDialog(dialogId) {
 }
 
 //Grabs all the data from the API response and build the tables in html
-function appRefresh(refreshType) {
+function refreshWeb(refreshType) {
     "use strict";
     //call refresher.php poster with "action" pressed.
-    $.customPOST({action: 'refresh', type: refreshType}, function (r) {
+    $.customPOST({action: 'refreshWeb', type: refreshType}, function (r) {
         if (r.conferenceArray && r.participantArray) {
             participantList = r.participantArray;
             conferenceList = r.conferenceArray;
-			var deviceQuery = r.deviceQuery, content = [], currentConference, column = 1, portsUsed = participantList.length, portsTotal = deviceQuery.videoPortAllocation[0]['count'], portsAvailable = portsTotal - portsUsed, portType = '', portAlert = '';
-            
+            var deviceQuery = r.deviceQuery, content = [], currentConference, column = 1, portsUsed = participantList.length, portsTotal = deviceQuery.videoPortAllocation[0]['count'], portsAvailable = portsTotal - portsUsed, portType = '', portAlert = '';
+
             //set the show is live variable to see if the show is in pre-show mode or in filming mode
             if (r.showIsLive === 'true') {
                 showIsLive = true;
             } else {
                 showIsLive = false;
             }
-            
+
             //rename the MCU returned port mode into a human readable value
             if (deviceQuery.videoPortAllocation[0]['type'].toUpperCase() === 'HD') {
                 portType = '720p';
             } else if (deviceQuery.videoPortAllocation[0]['type'].toUpperCase() === 'FULLHD') {
                 portType = '1080p';
             } else if (deviceQuery.videoPortAllocation[0]['type'].toUpperCase() === 'HDPLUS') {
-                portType = '720p60';
+                portType = '720p/1080p';
             }
-            
+
             //calculating the percentage of ports in use to allow operator to know capacity and limit
             if (portsUsed >= (portsTotal * 0.90)) {
                 portAlert = 'redAlert';
@@ -291,27 +63,27 @@ function appRefresh(refreshType) {
             } else {
                 portAlert = 'noAlert';
             }
-			
+
             //Buttons for Show setup and Tear Down
             content[0] = '<table id="conferenceTable" class="tableStyle">';
             content[0] += '<thead>';
             content[0] += '<tr class="tableHeader">';
-            content[0] += '<td colspan="100">Show Setup and Teardown Options</td>';
+            content[0] += '<th colspan="100">Show Setup and Teardown Options</th>';
             content[0] += '</tr>';
             content[0] += '</thead>';
             content[0] += '<tr>';
-            content[0] += '<td><input class="setupAll" type="button" value="Setup Conferences"/></td>';
-            content[0] += '<td><input class="clearPanePlacement" type="button" value="Reset All Panes"/></td>';
-            content[0] += '<td><input class="teardown" type="button" value="TEARDOWN"/></td>';
-			content[0] += '<td class="' + portAlert + '">' + portsAvailable + ' ' + portType + ' Ports Available' + '</td>';
-			
+            content[0] += '<td><input class="setupAll btn" type="button" value="Setup Conferences"/></td>';
+            content[0] += '<td><input class="clearPanePlacement btn" type="button" value="Reset All Panes"/></td>';
+            content[0] += '<td><input class="teardown btn btn--negative" type="button" value="TEARDOWN"/></td>';
+            content[0] += '<td class="' + portAlert + '">' + portsAvailable + ' ' + portType + ' Ports Available' + '</td>';
+
             //Check if we are in pre-show or Live mode and then have the appropriate radio button already selected
             if (showIsLive === true) {
-                content[0] += '<td><input class="preShow" type="radio" name="showIsLive" value="false">Pre-Show</td>';
-                content[0] += '<td><input class="liveShow" type="radio" name="showIsLive" value="true" checked="checked">Live!</td>';
+                content[0] += '<td><input id="preShowRadio" class="preShow" type="radio" name="showIsLive" value="false"><label for="preShowRadio">Pre-Show</label></td>';
+                content[0] += '<td><input id="liveRadio" class="liveShow" type="radio" name="showIsLive" value="true" checked="checked"><label for="liveRadio">Live!</label></td>';
             } else {
-                content[0] += '<td><input class="preShow" type="radio" name="showIsLive" value="false" checked="checked">Pre-Show</td>';
-                content[0] += '<td><input class="liveShow" type="radio" name="showIsLive" value="true">Live!</td>';
+                content[0] += '<td><input id="preShowRadio" class="preShow" type="radio" name="showIsLive" value="false" checked="checked"><label for="preShowRadio">Pre-Show</label></td>';
+                content[0] += '<td><input id="liveRadio" class="liveShow" type="radio" name="showIsLive" value="true"><label for="liveRadio">Live!</label></td>';
             }
 
             //Close the Setup Table
@@ -332,7 +104,6 @@ function appRefresh(refreshType) {
             content[0] += '<th class="specialGrid">Special Layouts</th>';
             content[0] += '<th class="audioRxMuted">Mute</th>';
             content[0] += '<th class="videoRxMuted hide">videoRxMuted</th>';
-            //content[0] += '<th class="videoTxMuted hide">videoRxMuted</th>';
             content[0] += '<th class="participantProtocol hide">Protocol</th>';
             content[0] += '<th class="participantType hide">Type</th>';
             content[0] += '<th class="conferenceName hide">Conference Name</th>';
@@ -376,7 +147,7 @@ function appRefresh(refreshType) {
                     displayName,
                     paneNumber,
                     paneLabelNumber;
-                
+
                 conferenceImportant = false;
 
                 content[0] += '<tr class="tableHeader" data-conf="' + currentConference + '">';
@@ -521,29 +292,31 @@ function appRefresh(refreshType) {
                     layoutName = 'Custom';
                 }
                 modalId = "openModal" + conferenceArrayInnerValue.uniqueId;
-                content[0] += '<td class="conferenceLayout" colspan="4" data-layout="' + layoutID + '">';
+                content[0] += '<td class="conferenceLayout" colspan="2" data-layout="' + layoutID + '">';
                 if (layoutName !== 'Important') {
                     content[0] += '<a href="#' + modalId + '" class="openLayouts" data-conf="' + currentConference + '" data-confid="' + conferenceArrayInnerValue.uniqueId + '">';
-                    content[0] += '<img class="currentLayoutHeader" src="css/images/layout' + layoutName + '.png" alt="currentLayout" height="40" onclick="layoutsDialog((\'' + modalId + '\'))"/></a>';
+                    content[0] += '<img class="currentLayoutHeader" src="css/images/layout' + layoutName + '.png" alt="currentLayout"  onclick="layoutsDialog((\'' + modalId + '\'))"/></a>';
                 } else {
-                    content[0] += '<img class="currentLayoutHeader"; src="css/images/layout' + layoutName + '.png" alt="currentLayout" height="40"/>';
+                    content[0] += '<img class="currentLayoutHeader"; src="css/images/layout' + layoutName + '.png" alt="currentLayout"/>';
                 }
                 content[0] += '<div id="' + modalId + '" class="modalDialog">';
                 content[0] += '<div>';
-                
+                content[0] += '<div class="modal-header">';
                 content[0] += '<a href="#close" title="Close" class="close" onclick="layoutsDialog((\'' + modalId + '\'))">X</a>';
-                content[0] += '<h2>' + currentConference + ' Layout</h2>';
-                content[0] += '<img class="currentLayout" src="css/images/layout' + layoutName + '.png" alt="currentLayout"/>';
+                content[0] += '<h3>' + currentConference + ' Layout</h2>';
+                content[0] += '</div>';
+                content[0] += '<div class="modal-body">';
+                //content[0] += '<img class="currentLayout" src="css/images/layout' + layoutName + '.png" alt="currentLayout"/>';
                 content[0] += '<ul class="layoutMenu">';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="1" value="1x1"' + isDisabled1 + '><img src="css/images/layout1x1.png" alt="1x1" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="16" value="1x2"' + isDisabled16 + '><img src="css/images/layout1x2.png" alt="1x2" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="2" value="2x2"' + isDisabled2 + '><img src="css/images/layout2x2.png" alt="2x2" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="8" value="3x2"' + isDisabled8 + '><img src="css/images/layout3x2.png" alt="3x2" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="53" value="4x2"' + isDisabled53 + '><img src="css/images/layout4x2.png" alt="4x2" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="3" value="3x3"' + isDisabled3 + '><img src="css/images/layout3x3.png" alt="3x3" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="9" value="4x3"' + isDisabled9 + '><img src="css/images/layout4x3.png" alt="4x3" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="4" value="4x4"' + isDisabled4 + '><img src="css/images/layout4x4.png" alt="4x4" height="40"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4" height="40"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="1" value="1x1"' + isDisabled1 + '><img src="css/images/layout1x1.png" alt="1x1"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="16" value="1x2"' + isDisabled16 + '><img src="css/images/layout1x2.png" alt="1x2"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="2" value="2x2"' + isDisabled2 + '><img src="css/images/layout2x2.png" alt="2x2"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="8" value="3x2"' + isDisabled8 + '><img src="css/images/layout3x2.png" alt="3x2"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="53" value="4x2"' + isDisabled53 + '><img src="css/images/layout4x2.png" alt="4x2"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="3" value="3x3"' + isDisabled3 + '><img src="css/images/layout3x3.png" alt="3x3"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="9" value="4x3"' + isDisabled9 + '><img src="css/images/layout4x3.png" alt="4x3"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="4" value="4x4"' + isDisabled4 + '><img src="css/images/layout4x4.png" alt="4x4"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4"/></button></li>';
                 content[0] += '</ul>';
                 content[0] += '<form id="panePlacement">';
 
@@ -705,14 +478,15 @@ function appRefresh(refreshType) {
                 content[0] += '<div style="clear:both"></div>';
                 content[0] += '</div>';
                 content[0] += '</div>';
+                content[0] += '</div>';
                 content[0] += '</td>';
-                content[0] += '<td class="confTitle" colspan="' + conferenceTotal + '"><span>' + currentConference + '</span>';
-                titlePosition = content[0].length;
-                content[0] += '</td>';
-                content[0] += '<td class="dialOutSection" colspan="2">';
-                content[0] += '<form onsubmit="return false" class="dialOutForm" id="dialOut' + conferenceArrayInnerValue.uniqueId + '">';
+                content[0] += '<td class="confTitle" colspan="' + (conferenceTotal+3) + '"><span>' + currentConference + '</span>';
+				
+				titlePosition = content[0].length;
+                
+				content[0] += '<form onsubmit="return false" class="dialOutForm" id="dialOut' + conferenceArrayInnerValue.uniqueId + '">';
                 content[0] += '<input class="dialOutInput" id="call' + conferenceArrayInnerValue.uniqueId + '" type="text" name="call">';
-                content[0] += '<input class="dialOut" data-confid="' + conferenceArrayInnerValue.uniqueId + '" data-conf="' + currentConference + '" type="button" value="Call">';
+                content[0] += '<input class="dialOut btn btn--white" data-confid="' + conferenceArrayInnerValue.uniqueId + '" data-conf="' + currentConference + '" type="button" value="Call">';
                 content[0] += '</form>';
                 content[0] += '</td>';
                 content[0] += '</tr>';
@@ -730,7 +504,14 @@ function appRefresh(refreshType) {
                             content[0] += '<tr class="codec">';
                         } else {
                             participantCounter = participantCounter + 1;
-                            content[0] += '<tr class="participantRow">';
+
+                            if (participantArrayInnerValue.packetLossCritical === true) {
+                                content[0] += '<tr class="participantRow redAlert">';
+                            } else if (participantArrayInnerValue.packetLossWarning === true) {
+                                content[0] += '<tr class="participantRow yellowAlert">';
+                            } else {
+                                content[0] += '<tr class="participantRow">';
+                            }
                         }
 
                         //For each participant, we will loop through each piece of data in the sub-array for that participant
@@ -738,7 +519,7 @@ function appRefresh(refreshType) {
                             elementCounter = elementCounter + 1;
 
                             //These fields get printed to the table, but the "hide" tag is added to each so they are not visible
-                            if (participantArraySubI === 'participantName' || participantArraySubI === 'participantProtocol' || participantArraySubI === 'participantType' || participantArraySubI === 'conferenceName' || participantArraySubI === 'videoRxMuted' || participantArraySubI === 'connectionUniqueId' || participantArraySubI === 'cpLayout') {
+                            if (participantArraySubI === 'participantName' || participantArraySubI === 'participantProtocol' || participantArraySubI === 'participantType' || participantArraySubI === 'conferenceName' || participantArraySubI === 'videoRxMuted' || participantArraySubI === 'cpLayout') {
                                 content[0] += '<td class="' + participantArraySubI + ' hide">' + participantArraySubObject + '</td>';
 
                             } else if (participantArraySubI === 'pane') {
@@ -746,6 +527,7 @@ function appRefresh(refreshType) {
                             } else if (participantArraySubI === 'participantPreview') {
 
                                 //This section ensures that we only update the preview URL if we have passed the refreshPreview timeout
+                                /*
                                 currentTime = new Date().getTime();
 
                                 if (currentTime >= (lastRefresh + refreshPreview)) {
@@ -754,6 +536,7 @@ function appRefresh(refreshType) {
                                 } else {
                                     time = lastRefresh;
                                 }
+                                */
 
                                 //This code adds previews to the page. Right now it is disabled until we can figure out how to download the images to the web server then host from here. Otherwise, load/latency is too high on MCU. DO NOT DELETE
                                 //content[0] += '<td class="'+participantArraySubI+' hide"> <div class="preview"><img class="fullsize" src="'+participantArraySubObject+'?'+time+'" alt="Preview"><img class="thumb" width="40" height="22" src="'+participantArraySubObject+'?'+time+'" alt="Preview"> </div></td>';
@@ -765,74 +548,75 @@ function appRefresh(refreshType) {
 
                             } else if (participantArraySubI === 'audioRxMuted') {
 
-                                //if (participantArrayInnerValue.displayName == "__") {
-                                    /*
-                                    if(participantArrayInnerValue.audioTxMuted==true){
-                                        content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/muted.png" value="Unmute" action="confUnmute" conf="'+currentConference+'">';
-                                    } else {
-                                        content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/unmuted.png" value="Mute" action="confMute" conf="'+currentConference+'">';
-                                    }
-                                    */
-
-                                    //content[0] += '<td class="muteimages"></td>';
-
-                                //} else {
-                                    //Set mute images appropriately based on the response from the API. This should a participants current audio and video mute status
+                                //Set mute images appropriately based on the response from the API. This should a participants current audio and video mute status
                                 if (participantArraySubObject === false || participantArraySubObject === '0') {
-                                    content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/unmuted.png" value="Mute" action="audioMute" data-conf="' + currentConference + '">';
+                                    //content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/audioRX-unmuted.png" height="24" width="24" value="Mute" action="audioRXmute" data-conf="' + currentConference + '">';
+                                    content[0] += '<td class="muteimages"><div class="mutebuttons"><span class="muteCommand icon icon-microphone icon-2x" value="Mute" action="audioRXmute" data-conf="' + currentConference + '"></span>';
                                 } else {
-                                    content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/muted.png" value="Unmute" action="audioUnmute" data-conf="' + currentConference + '">';
+                                    //content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/audioRX-muted.png"  height="24" width="24" value="Unmute" action="audioRXunmute" data-conf="' + currentConference + '">';
+                                    content[0] += '<td class="muteimages"><div class="mutebuttons"><span class="muteCommand icon icon-mute icon-2x" value="Unmute" action="audioRXunmute" data-conf="' + currentConference + '"></span>';
+                                }
+
+                                if (participantArrayInnerValue.audioTxMuted === false || participantArrayInnerValue.audioTxMuted === '0') {
+                                    //content[0] += '<img class="muteCommand" src="./css/images/audioTX-unmuted.png" height="24" width="24" value="Mute" action="audioTXmute" data-conf="' + currentConference + '">';
+                                     content[0] += '<span class="muteCommand icon icon-audio icon-2x" value="Mute" action="audioTXmute" data-conf="' + currentConference + '"></span>';
+                                } else {
+                                    //content[0] += '<img class="muteCommand" src="./css/images/audioTX-muted.png" height="24" width="24" value="Unmute" action="audioTXunmute" data-conf="' + currentConference + '">';
+                                    content[0] += '<span class="muteCommand icon icon-volume-cross icon-2x" value="Unmute" action="audioTXunmute" data-conf="' + currentConference + '"></span>';
                                 }
 
                                 if (participantArrayInnerValue.videoRxMuted === false || participantArrayInnerValue.videoRxMuted === '0') {
-                                    content[0] += '<img class="muteCommand" src="./css/images/video-unmuted.png" value="Mute" action="videoMute" data-conf="' + currentConference + '">';
+                                    //content[0] += '<img class="muteCommand" src="./css/images/videoRX-unmuted.png" height="24" width="24" value="Mute" action="videoRXmute" data-conf="' + currentConference + '">';
+                                    content[0] += '<span class="muteCommand icon icon-video icon-2x" value="Mute" action="videoRXmute" data-conf="' + currentConference + '"></span>';
                                 } else {
-                                    content[0] += '<img class="muteCommand" src="./css/images/video-muted.png" value="Unmute" action="videoUnmute" data-conf="' + currentConference + '">';
+                                    //content[0] += '<img class="muteCommand" src="./css/images/videoRX-muted.png" height="24" width="24" value="Unmute" action="videoRXunmute" data-conf="' + currentConference + '">';
+                                    content[0] += '<span class="muteCommand icon icon-video-cross icon-2x" value="Unmute" action="videoRXunmute" data-conf="' + currentConference + '"></span>';
                                 }
 
                                 if (participantArrayInnerValue.videoTxMuted === false || participantArrayInnerValue.videoTxMuted === '0') {
-                                    content[0] += '<img class="muteCommand" src="./css/images/videoaudiotx-unmuted.png" value="Mute" action="txMuteAll" data-conf="' + currentConference + '"></div><div class="clearfloat"></div></td>';
+                                    //content[0] += '<img class="muteCommand" src="./css/images/videoTX-unmuted.png" height="24" width="24" value="Mute" action="videoTXmute" data-conf="' + currentConference + '"></div><div class="clearfloat"></div></td>';
+                                    content[0] += '<span class="muteCommand icon icon-view-preview-telepresence icon-2x" value="Mute" action="videoTXmute" data-conf="' + currentConference + '"></span></div><div class="clearfloat"></div></td>';
                                 } else {
-                                    content[0] += '<img class="muteCommand" src="./css/images/videoaudiotx-muted.png" value="Unmute" action="txUnmuteAll" data-conf="' + currentConference + '"></div><div class="clearfloat"></div></td>';
+                                    //content[0] += '<img class="muteCommand" src="./css/images/videoTX-muted.png" height="24" width="24" value="Unmute" action="videoTXunmute" data-conf="' + currentConference + '"></div><div class="clearfloat"></div></td>';
+                                    content[0] += '<span class="muteCommand icon icon-view-preview-telepresence icon-view-preview-telepresence-muted icon-2x" value="Unmute" action="videoTXunmute" data-conf="' + currentConference + '"></span></div><div class="clearfloat"></div></td>';
                                 }
 
-                                //}
-
-                            } else if (participantArraySubI === 'videoTxMuted' || participantArraySubI === 'audioTxMuted' || participantArraySubI === 'important') {
-                                // Print NOTHING
-                            } else {
+                            } else if (participantArraySubI === 'displayName') {
                                 //Check for special character names for Loops and Codecs to treat them properly
                                 var participantNameOveride = participantArraySubObject;
-                                if (participantArraySubI === 'displayName' && participantArraySubObject === "_") {
+
+                                if (participantArraySubObject === "_") {
                                     participantNameOveride = 'Loop';
-                                } else if (participantArraySubI === 'displayName' && participantArraySubObject === "__") {
+                                } else if (participantArraySubObject === "__") {
                                     participantNameOveride = 'Codec';
                                 } else {
-									//For non-codec and non-loop participants
-									//Is the current participant important?
-									if (participantArrayInnerValue.important === true) {
-										var participantMarked = "reset";
-									} else {
-										var participantMarked = "";
-									}
-								}
-								
-								//If the current layout is NOT 1 (single participant), then offer the focus button to make a user important
-								if (participantNameOveride != 'Loop' && participantNameOveride != 'Codec' && currentConference != waitingRoom) {
-									if (layoutID + 1 === 2 || layoutID + 1 === 3 || layoutID + 1 === 8) {
-                                        content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-connectionuniqueid="' + participantArrayInnerValue.connectionUniqueId + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="setImportantParticipant" type="button" value="Special Grid"/><input class="setFocusParticipant" type="button" value="Single Pane"/></td>';
+                                    //For non-codec and non-loop participants
+                                    //Is the current participant important?
+
+                                    if (participantArrayInnerValue.important === true || participantArrayInnerValue.important === '1') {
+                                        var participantMarked = "reset";
+                                    } else {
+                                        var participantMarked = "";
+                                    }
+                                }
+
+
+                                //If the current layout is NOT 1 (single participant), then offer the focus button to make a user important
+                                if (participantNameOveride != 'Loop' && participantNameOveride != 'Codec' && currentConference != waitingRoom) {
+                                    if (layoutID + 1 === 2 || layoutID + 1 === 3 || layoutID + 1 === 8 || layoutID + 1 === 16) {
+                                        content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="setImportantParticipant btn btn--primary" type="button" value="Special Grid"/><input class="setFocusParticipant btn btn--primary" type="button" value="Single Pane"/></td>';
                                     } else if (layoutID + 1 === 33 || layoutID + 1 === 23) {
                                         if (participantMarked === "reset") {
-                                            content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-connectionuniqueid="' + participantArrayInnerValue.connectionUniqueId + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="' + participantMarked + 'specialLayout" type="button" value="Reset View"/></td>';
+                                            content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="' + participantMarked + 'specialLayout btn btn--meetings" type="button" value="Reset View"/></td>';
                                         } else {
-                                            content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-connectionuniqueid="' + participantArrayInnerValue.connectionUniqueId + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="' + participantMarked + 'specialLayout" type="button" value="Switch Focus"/></td>';
+                                            content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="' + participantMarked + 'specialLayout btn btn--primary" type="button" value="Switch Focus"/></td>';
                                         }
                                     } else {
-                                        content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-connectionuniqueid="' + participantArrayInnerValue.connectionUniqueId + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td></td>';
+                                        content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="setFocusParticipant btn btn--primary" style="width: 250px" type="button" value="Single Pane"/></td>';
                                     }
-								} else {
-                                    content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-connectionuniqueid="' + participantArrayInnerValue.connectionUniqueId + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td></td>';
-                                }							
+                                } else {
+                                    content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td></td>';
+                                }
                             }
                         });
                         //For each conference, we create a button to move that participant to the NOT-CURRENT conference. For the current conference, loops, and codecs, we do not offer transfer buttons.
@@ -840,23 +624,24 @@ function appRefresh(refreshType) {
                             $.each(conferenceArrayInnerValue, function (conferenceArraySubI, conferenceArraySubObject) {
                                 if (conferenceArraySubObject !== currentConference && conferenceArraySubI === "conferenceName") {
                                     if (participantArrayInnerValue.displayName === "_") {
-                                        content[0] += '<td class="loopConference">&#10008;</td>';
+                                        content[0] += '<td class="loopConference"></td>';
                                     } else if (participantArrayInnerValue.displayName === "__") {
-                                        content[0] += '<td class="loopConference">&#10008;</td>';
+                                        content[0] += '<td class="loopConference"></td>';
                                     } else if (conferenceImportant === true) {
-                                        //content[0] += '<td class="participant">' + conferenceArraySubObject + '</td>';
-                                        content[0] += '<td class="participant"><input class="doNothing" type="button" value="' + conferenceArraySubObject + '"/></td>';
+                                        content[0] += '<td class="participant"><input class="btn disabled" type="button" value="' + conferenceArraySubObject + '"/></td>';
                                     } else {
-                                        content[0] += '<td class="participant"><input class="transfer' + conferenceArraySubI + '" type="button" value="' + conferenceArraySubObject + '"/></td>';
+                                        content[0] += '<td class="participant"><input class="btn transfer' + conferenceArraySubI + '" type="button" value="' + conferenceArraySubObject + '"/></td>';
                                     }
                                 } else if (conferenceArraySubObject === currentConference && conferenceArraySubI === "conferenceName") {
-                                    content[0] += '<td class="currentConference">' + conferenceArraySubObject + '</td>';
+                                    //content[0] += '<td class="currentConference">' + conferenceArraySubObject + '</td>';
+                                    content[0] += '<td class="participant"><input class="btn disabled" type="button" value="' + conferenceArraySubObject + '"/></td>';
                                 }
                             });
                         });
 
                         //Creates a drop button for each participant including Loops and Codecs
-                        content[0] += '<td class="dropCell"><input class="drop" type="button" value="DROP"/></td>';
+                        //content[0] += '<td class="dropCell"><input class="drop btn btn--negative" type="button" value="DROP"/></td>';
+                        content[0] += '<td class="dropCell"><span class="drop icon icon-exit-contain icon-2x"></span></td>';
                         content[0] += '</tr>';
 
                     }
@@ -867,19 +652,47 @@ function appRefresh(refreshType) {
                     content[0] += '<td></td>';
                     content[0] += '<td>ALL PARTICIPANTS</td>';
                     content[0] += '<td></td>';
-                    content[0] += '<td></td>';
+                    //TD for Mute All icons
+                    content[0] += '<td class="muteimages">';
+                    content[0] += '<div class="mutebuttons muteAllParticipants">';
+                    content[0] += '<span class="muteAllCommand icon icon-microphone icon-2x" value="Mute" action="audioRXunmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioRX-unmuted.png" height="24" width="24" value="Unmute" action="audioRXunmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '<span class="muteAllCommand icon icon-audio icon-2x" value="Mute" action="audioTXunmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioTX-unmuted.png" height="24" width="24" value="Unmute" action="audioTXunmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '<span class="muteAllCommand icon icon-video icon-2x" value="Mute" action="videoRXunmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoRX-unmuted.png" height="24" width="24" value="Unmute" action="videoRXunmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '<span class="muteAllCommand icon icon-view-preview-telepresence icon-2x" value="Mute" action="videoTXunmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoTX-unmuted.png" height="24" width="24" value="Unmute" action="videoTXunmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '</div><div class="clearfloat"></div>';
+                    content[0] += '<div class="mutebuttons">';
+                    content[0] += '<span class="muteAllCommand icon icon-mute icon-2x" value="Unmute" action="audioRXmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioRX-muted.png"  height="24" width="24"value="Mute" action="audioRXmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '<span class="muteAllCommand icon icon-volume-cross icon-2x" value="Unmute" action="audioTXmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioTX-muted.png" height="24" width="24" value="Mute" action="audioTXmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '<span class="muteAllCommand icon icon-video-cross icon-2x" value="Unmute" action="videoRXmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoRX-muted.png" height="24" width="24" value="Mute" action="videoRXmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '<span class="muteAllCommand icon icon-view-preview-telepresence icon-view-preview-telepresence-muted icon-2x" value="Unmute" action="videoTXmuteAll" data-conf="' + currentConference + '"></span>';
+                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoTX-muted.png" height="24" width="24" value="Mute" action="videoTXmuteAll" data-conf="' + currentConference + '">';
+                    content[0] += '</div><div class="clearfloat"></div></td>';
+                    content[0] += '</td>';
+                    //For each conference, create a Transfer ALL buttons
                     $.each(conferenceList, function (conferenceArrayInnerKey, conferenceArrayInnerValue) {
                         //$.each(conferenceArrayInnerValue, function (conferenceArraySubI, conferenceArraySubObject) {
                         if (conferenceArrayInnerKey !== currentConference) {
-                            content[0] += '<td class="participant"><input class="transferAll" type="button" data-conf="' + currentConference + '" value="' + conferenceArrayInnerValue.conferenceName + '"/></td>';
+                            if (conferenceImportant === true) {
+                                content[0] += '<td class="participant"><input class="btn disabled" type="button" data-conf="' + currentConference + '" value="' + conferenceArrayInnerValue.conferenceName + '"/></td>';
+                            } else {
+                                content[0] += '<td class="participant"><input class="transferAll btn" type="button" data-conf="' + currentConference + '" value="' + conferenceArrayInnerValue.conferenceName + '"/></td>';
+                            }
                         } else if (conferenceArrayInnerKey === currentConference) {
-                            content[0] += '<td class="currentConference">' + conferenceArrayInnerValue.conferenceName + '</td>';
+                            content[0] += '<td class="currentConference"><input class="btn disabled" type="button" value="' + conferenceArrayInnerValue.conferenceName + '"/></td>';
                         }
                         //});
                     });
 
                     //Creates a drop button for each participant including Loops and Codecs
-                    content[0] += '<td class="dropCell"><input class="dropAll" type="button" data-conf="' + currentConference + '" value="DROP ALL"/></td>';
+                    //content[0] += '<td class="dropCell"><input class="dropAll" type="button" data-conf="' + currentConference + '" value="DROP ALL"/></td>';
+                    content[0] += '<td class="dropCell"><span class="dropAll icon icon-exit-contain icon-2x" data-conf="' + currentConference + '"></span></td>';
                     content[0] += '</tr>';
                 }
                 //conferenceCounts[currentConference] = participantCounter;
@@ -897,17 +710,24 @@ function appRefresh(refreshType) {
             content[0] += '</table>';
             content[0] += '</div>';
             content[0] += r.appVersion;
-			
+
+            var refreshState = [];
+            refreshState[0] = 'I did not refresh';
+
             //See if anything has changed. If not, don't update. If there is a change, update.
             if (checkContent[0] == '' || checkContent[0] !== content[0]) {
                 $('#mainSlice').empty();
                 //Push the content variable which contains all the HTML to the mainslice
                 $('#mainSlice').append(content[0]);
+                refreshState[0] = 'I did refresh';
+                refreshState[1] = checkContent[0];
+                refreshState[2] = content[0];
                 if (openModalId !== "") {
                     layoutsDialog(openModalId);
                 }
                 checkContent[0] = content[0];
             }
+            //console.log(refreshState);
         }
 
         if (r.debugArray !== '') {
@@ -934,16 +754,26 @@ function transferParticipants(scrubbedParticipantList, sourceConference, sourceT
         success: function (r) {
             if (r.alert) {
                 console.log(r.alert);
-            } else if (r.refresh === true) {
+            }
+        }
+    });
+}
 
-                clearInterval(refreshInterval);
+//New Mute Command that takes one or more participants to mute in a single action
+function muteParticipants(scrubbedParticipantList, conferenceName, muteChannel, muteAction) {
+    "use strict";
 
-                appRefresh('refresh');
+    //post this information to refresher.php to take action
+    $.ajax({
+        type: "POST",
+        url: "refresher.php",
+        data: {action: "muteCommand", scrubbedParticipantList: scrubbedParticipantList, conferenceName: conferenceName, muteChannel: muteChannel, muteAction: muteAction},
+        dataType: "json",
+        cache: false,
 
-                refreshInterval = setInterval(function () {
-                    appRefresh('refresh');
-                }, refreshTimer);
-
+        success: function (r) {
+            if (r.alert) {
+                console.log(r.alert);
             }
         }
     });
@@ -952,22 +782,88 @@ function transferParticipants(scrubbedParticipantList, sourceConference, sourceT
 //Function set either the important or focus view
 function setSpecialLayout(scrubbedParticipantList, participantName, participantProtocol, participantType, conferenceName, layoutType) {
     "use strict";
-    
-	//post this information to refresher.php to take action
-	$.ajax({
-		type: "POST",
-		url: "refresher.php",
-		data: {action: "setSpecialLayout", scrubbedParticipantList: scrubbedParticipantList, participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName, layoutType: layoutType},
-		dataType: "json",
-		cache: false,
 
-		success: function (r) {
-			if (r.alert) {
-				console.log(r.alert);
-			}
-		}
-	});
+    //post this information to refresher.php to take action
+    $.ajax({
+        type: "POST",
+        url: "refresher.php",
+        data: {action: "setSpecialLayout", scrubbedParticipantList: scrubbedParticipantList, participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName, layoutType: layoutType},
+        dataType: "json",
+        cache: false,
+
+        success: function (r) {
+            if (r.alert) {
+                console.log(r.alert);
+            }
+        }
+    });
 }
+
+//Function to tell refresher.php to update the DB with all participant information
+function writeParticipantEnumerate() {
+    "use strict";
+
+    //post this information to refresher.php to take action
+    $.ajax({
+        type: "POST",
+        url: "refresher.php",
+        data: {action: "writeParticipantEnumerate"},
+        dataType: "json",
+        cache: false,
+
+        success: function (r) {
+            if (r.alert) {
+                console.log(r.alert);
+            }
+        }
+    });
+}
+
+//Function to tell refresher.php to update the DB with all conference information
+function writeConferenceEnumerate() {
+    "use strict";
+
+    //post this information to refresher.php to take action
+    $.ajax({
+        type: "POST",
+        url: "refresher.php",
+        data: {action: "writeConferenceEnumerate"},
+        dataType: "json",
+        cache: false,
+
+        success: function (r) {
+            if (r.alert) {
+                console.log(r.alert);
+            }
+        }
+    });
+}
+
+//Function to tell refresher.php to update the DB with all paneplacement information
+function writePanesDB() {
+    "use strict";
+
+    //post this information to refresher.php to take action
+    $.ajax({
+        type: "POST",
+        url: "refresher.php",
+        data: {action: "writePanesDB"},
+        dataType: "json",
+        cache: false,
+
+        success: function (r) {
+            if (r.alert) {
+                console.log(r.alert);
+            }
+        }
+    });
+}
+
+//Sends post info to refresher.php
+$.customPOST = function (data, callback) {
+    "use strict";
+    $.post('refresher.php', data, callback, 'json');
+};
 
 //Catches all button clicks on the page
 $(document).ready(function () {
@@ -984,37 +880,30 @@ $(document).ready(function () {
         success: function (r) {
             if (r.alert) {
                 console.log(r.alert);
-                //alert('in alert');
             } else {
-                //mcuIP = r.settings.mcuIP.value;
-                //wallConference = r.settings.wallConference.value;
                 waitingRoom = r.settings.waitingRoom.value;
-                //mobileConf2 = r.settings.mobileConf2.value;
-                //mobileConf3 = r.settings.mobileConf3.value;
-                //domainName = r.settings.domainName.value;
-                //alert('reading settings');
-                /*
-                for (i = 1; i < 10; i = i + 1) {
-                    var codecN = 'codec' + i;
-                    codecsArray[i] = r.settings[codecN].value;
-                }
-                */
+                refreshWebTimer = r.settings.timerWebRefresh.value;
+                writeConferenceTimer = r.settings.timerConferencesDB.value;
+                writeParticipantTimer = r.settings.timerParticipantsDB.value;
+                writePanesDBTimer = r.settings.timerPanePlacementDB.value;
+                //console.log("I set settings");
+
+                refreshWeb('first');
+
+                //Set the interval for how often we want the page to refresh
+                refreshWebInterval = setInterval(function () {
+                    refreshWeb('refresh');
+                }, refreshWebTimer);
+
+                writeConferenceInterval = setInterval(writeConferenceEnumerate, writeConferenceTimer);
+                writeParticipantInterval = setInterval(writeParticipantEnumerate, writeParticipantTimer);
+                writePanesDBInterval = setInterval(writePanesDB, writePanesDBTimer);
             }
         }
     });
 
-    //If the page was just loaded, we will run the first initial page refresh
-    if (lastRefresh === 0) {
-        //appRefresh('first');
-    }
-
-    //Set the interval for how often we want the page to refresh
-    refreshInterval = setInterval(function () {
-        appRefresh('refresh');
-    }, refreshTimer);
-
     //Transfer a single participant
-    $(document).on('click', '.transferconferenceName', function () {
+    $(document).on('mousedown', '.transferconferenceName', function () {
         var participantName = $(this).closest("tr").find(".displayName").data("participantname"), sourceConference = $(this).closest("tr").find(".displayName").data("conferencename"), destinationConference = $(this).attr("value"), scrubbedParticipantList = {}, sourceType, sourceLayout, destLayout, destType;
 
         //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
@@ -1051,18 +940,23 @@ $(document).ready(function () {
         } else {
             if (destLayout === 0) {
                 destType = "focus";
+            } else if (destLayout === 22 || destLayout === 32) {
+                destType = "special";
             } else {
                 destType = "grid";
             }
         }
 
-        //console.log(scrubbedParticipantList);// + ' ' + sourceConference + ' ' + sourceType + ' ' + destinationConference + ' ' + destType);
-        transferParticipants(scrubbedParticipantList, sourceConference, sourceType, destinationConference, destType);
-
+        if (destType !== "special") {
+            transferParticipants(scrubbedParticipantList, sourceConference, sourceType, destinationConference, destType);
+        } else {
+            alert("Can not move participants into a conference set to Special Mode. Change the destination conference to a standard layout and then try again.");
+        }
+        
     });
 
     //Transfer ALL participants in a conference
-    $(document).on('click', '.transferAll', function () {
+    $(document).on('mousedown', '.transferAll', function () {
         var sourceConference = $(this).data("conf"), destinationConference = $(this).attr("value"), scrubbedParticipantList = {}, sourceType, sourceLayout, destLayout, destType;
 
         //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
@@ -1098,20 +992,26 @@ $(document).ready(function () {
         } else {
             if (destLayout === 0) {
                 destType = "focus";
+            } else if (destLayout === 22 || destLayout === 32) {
+                destType = "special";
             } else {
                 destType = "grid";
             }
         }
 
         //Present a warning popup and require a confirmation
-        if (confirm('This will move ALL participants from "' + sourceConference + '" to "' + destinationConference + '". Are you sure?')) {
-            transferParticipants(scrubbedParticipantList, sourceConference, sourceType, destinationConference, destType);
+        if (destType !== "special") {
+            if (confirm('This will move ALL participants from "' + sourceConference + '" to "' + destinationConference + '". Are you sure?')) {
+                transferParticipants(scrubbedParticipantList, sourceConference, sourceType, destinationConference, destType);
+            }
+        } else {
+            alert("Can not move participants into a conference set to Special Mode. Change the destination conference to a standard layout and then try again.");
         }
 
     });
 
     //Drop a participant
-    $(document).on('click', '.drop', function () {
+    $(document).on('mousedown', '.drop', function () {
         //find the closest td with the info we need for a move and store in a var
         var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).closest("tr").find(".displayName").data("conferencename");
 
@@ -1132,100 +1032,100 @@ $(document).ready(function () {
     });
 
     //Mute command that encompasses muting, unmuting, and codec muting into one onclick function
-    $(document).on('click', '.muteCommand', function () {
+    $(document).on('mousedown', '.muteCommand', function () {
 
-        var conferenceName = $(this).data("conf"), muteCommand = $(this).attr("action"), muteAction, muteChannel, participantName, participantProtocol, participantType;
+        var participantName = $(this).closest("tr").find(".displayName").data("participantname"), conferenceName = $(this).data("conf"), muteCommand = $(this).attr("action"), muteAction, muteChannel, scrubbedParticipantList = {};
 
-        if (muteCommand === 'audioMute') {
-            muteAction = 'mute';
-            muteChannel = 'audioRxMuted';
-            participantName = $(this).closest("tr").find(".displayName").data("participantname");
-            participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol");
-            participantType = $(this).closest("tr").find(".displayName").data("participanttype");
-        } else if (muteCommand === 'audioUnmute') {
-            muteAction = 'unmute';
-            muteChannel = 'audioRxMuted';
-            participantName = $(this).closest("tr").find(".displayName").data("participantname");
-            participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol");
-            participantType = $(this).closest("tr").find(".displayName").data("participanttype");
-        } else if (muteCommand === 'videoMute') {
-            muteAction = 'mute';
-            muteChannel = 'videoRxMuted';
-            participantName = $(this).closest("tr").find(".displayName").data("participantname");
-            participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol");
-            participantType = $(this).closest("tr").find(".displayName").data("participanttype");
-        } else if (muteCommand === 'videoUnmute') {
-            muteAction = 'unmute';
-            muteChannel = 'videoRxMuted';
-            participantName = $(this).closest("tr").find(".displayName").data("participantname");
-            participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol");
-            participantType = $(this).closest("tr").find(".displayName").data("participanttype");
-        } else if (muteCommand === 'confMute') {
-            muteAction = 'mute';
-            muteChannel = 'audioTxMuted';
-            participantName = $('tr:has(td.conferenceName:contains(' + conferenceName + ')):has(td.displayName:contains("Codec"))').find(".displayName").data("participantname");
-            participantProtocol = $('tr:has(td.conferenceName:contains(' + conferenceName + ')):has(td.displayName:contains("Codec"))').find(".displayName").data("participantprotocol");
-            participantType = $('tr:has(td.conferenceName:contains(' + conferenceName + ')):has(td.displayName:contains("Codec"))').find(".displayName").data("participanttype");
-        } else if (muteCommand === 'confUnmute') {
-            muteAction = 'unmute';
-            muteChannel = 'audioTxMuted';
-            participantName = $('tr:has(td.conferenceName:contains(' + conferenceName + ')):has(td.displayName:contains("Codec"))').find(".displayName").data("participantname");
-            participantProtocol = $('tr:has(td.conferenceName:contains(' + conferenceName + ')):has(td.displayName:contains("Codec"))').find(".displayName").data("participantprotocol");
-            participantType = $('tr:has(td.conferenceName:contains(' + conferenceName + ')):has(td.displayName:contains("Codec"))').find(".displayName").data("participanttype");
-        } else if (muteCommand === 'txMuteAll') {
-            muteAction = 'mute';
-            muteChannel = 'txAll';
-            participantName = $(this).closest("tr").find(".displayName").data("participantname");
-            participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol");
-            participantType = $(this).closest("tr").find(".displayName").data("participanttype");
-        } else if (muteCommand === 'txUnmuteAll') {
-            muteAction = 'unmute';
-            muteChannel = 'txAll';
-            participantName = $(this).closest("tr").find(".displayName").data("participantname");
-            participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol");
-            participantType = $(this).closest("tr").find(".displayName").data("participanttype");
-        }
+        //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
+        $.each(participantList, function (participantListInnerKey, participantListInnerValue) {
+            if (participantListInnerValue.participantName == participantName) {
+                scrubbedParticipantList[participantListInnerValue.participantName] = {
+                    'participantName' : participantListInnerValue.participantName,
+                    'participantProtocol' : participantListInnerValue.participantProtocol,
+                    'participantType' : participantListInnerValue.participantType,
+                    'displayName' : participantListInnerValue.displayName,
+                    'pane' : participantListInnerValue.pane
+                };
 
-        //alert(/*conferenceName + ' ' + muteCommand + ' ' + */ muteAction + ' ' + muteChannel);
-
-        //post this information to refresher.php to take action
-        $.ajax({
-            type: "POST",
-            url: "refresher.php",
-            data: {action: "muteCommand", participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName, muteChannel: muteChannel, operationScope: "activeState", muteAction: muteAction},
-            dataType: "json",
-            cache: false,
-
-            success: function (r) {
-                //alert(r);
-                if (r.alert) {
-                    console.log(r.alert);
-                }
             }
         });
-    });
 
-    /*
-    //Shows or hides the setup options for the grid conference *****Delete?
-    $(document).on('click', '.showSetup', function () {
-
-        //alert($(this).val());
-
-        if ($(this).val() === "Show Setup") {
-            showSetup = true;
-        } else if ($(this).val() === "Hide Setup") {
-            showSetup = false;
+        if (muteCommand === 'audioRXmute') {
+            muteAction = 'mute';
+            muteChannel = 'audioRxMuted';
+        } else if (muteCommand === 'audioRXunmute') {
+            muteAction = 'unmute';
+            muteChannel = 'audioRxMuted';
+        } else if (muteCommand === 'audioTXmute') {
+            muteAction = 'mute';
+            muteChannel = 'audioTxMuted';
+        } else if (muteCommand === 'audioTXunmute') {
+            muteAction = 'unmute';
+            muteChannel = 'audioTxMuted';
+        } else if (muteCommand === 'videoRXmute') {
+            muteAction = 'mute';
+            muteChannel = 'videoRxMuted';
+        } else if (muteCommand === 'videoRXunmute') {
+            muteAction = 'unmute';
+            muteChannel = 'videoRxMuted';
+        } else if (muteCommand === 'videoTXmute') {
+            muteAction = 'mute';
+            muteChannel = 'txAll';
+        } else if (muteCommand === 'videoTXunmute') {
+            muteAction = 'unmute';
+            muteChannel = 'txAll';
         }
 
-        //alert(showSetup);
-
+        muteParticipants(scrubbedParticipantList, conferenceName, muteChannel, muteAction);
     });
-    */
+
+    $(document).on('mousedown', '.muteAllCommand', function () {
+
+        var conferenceName = $(this).data("conf"), muteCommand = $(this).attr("action"), muteAction, muteChannel, scrubbedParticipantList = {};
+
+        //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
+        $.each(participantList, function (participantListInnerKey, participantListInnerValue) {
+            if (participantListInnerValue.conferenceName === conferenceName && participantListInnerValue.displayName !== "_" && participantListInnerValue.displayName !== "__") {
+                scrubbedParticipantList[participantListInnerValue.participantName] = {
+                    'participantName' : participantListInnerValue.participantName,
+                    'participantProtocol' : participantListInnerValue.participantProtocol,
+                    'participantType' : participantListInnerValue.participantType
+                };
+            }
+        });
+
+        if (muteCommand === 'audioRXmuteAll') {
+            muteAction = 'mute';
+            muteChannel = 'audioRxMuted';
+        } else if (muteCommand === 'audioRXunmuteAll') {
+            muteAction = 'unmute';
+            muteChannel = 'audioRxMuted';
+        } else if (muteCommand === 'audioTXmuteAll') {
+            muteAction = 'mute';
+            muteChannel = 'audioTxMuted';
+        } else if (muteCommand === 'audioTXunmuteAll') {
+            muteAction = 'unmute';
+            muteChannel = 'audioTxMuted';
+        } else if (muteCommand === 'videoRXmuteAll') {
+            muteAction = 'mute';
+            muteChannel = 'videoRxMuted';
+        } else if (muteCommand === 'videoRXunmuteAll') {
+            muteAction = 'unmute';
+            muteChannel = 'videoRxMuted';
+        } else if (muteCommand === 'videoTXmuteAll') {
+            muteAction = 'mute';
+            muteChannel = 'txAll';
+        } else if (muteCommand === 'videoTXunmuteAll') {
+            muteAction = 'unmute';
+            muteChannel = 'txAll';
+        }
+
+        muteParticipants(scrubbedParticipantList, conferenceName, muteChannel, muteAction);
+    });
 
     //Set the layout for the grid conference
-    $(document).on('click', '.layout', function () {
+    $(document).on('mousedown', '.layout', function () {
         var layoutNumber = $(this).data("layout"), conferenceName = $(this).data("conf"), modalId = $(this).parent().parent().parent().parent().attr('id'), conferenceId = $(this).parent().parent().parent().parent().parent().data("confid"), displayName;
-        //alert(layoutNumber);
 
         //post this information to refresher.php to take action
         $.ajax({
@@ -1236,9 +1136,6 @@ $(document).ready(function () {
             cache: false,
 
             success: function (r) {
-                if (r.panePlacement) {
-                    panePlacementDropdowns(r.panePlacement, conferenceName, conferenceId, displayName);
-                }
                 if (r.alert) {
                     console.log(r.alert);
                 }
@@ -1247,7 +1144,7 @@ $(document).ready(function () {
     });
 
     //Initiate dial out
-    $(document).on('click', '.dialOut', function () {
+    $(document).on('mousedown', '.dialOut', function () {
 
         var conferenceName = $(this).data("conf"), confId = $(this).data("confid"), callNumber = $('#call' + confId).val();
 
@@ -1294,7 +1191,7 @@ $(document).ready(function () {
     });
 
     //Drop all participants from a conference
-    $(document).on('click', '.dropAll', function () {
+    $(document).on('mousedown', '.dropAll', function () {
         var conferenceName = $(this).data("conf");
         //post this information to refresher.php to take action
         if (confirm('This will DROP all participants from "' + conferenceName + '"! Are you sure?')) {
@@ -1316,7 +1213,7 @@ $(document).ready(function () {
     });
 
     //Teardown all participants, loops, and codecs from all conferences
-    $(document).on('click', '.teardown', function () {
+    $(document).on('mousedown', '.teardown', function () {
         var conferenceName = $(this).data("conf");
         //post this information to refresher.php to take action
         if (confirm('This will DROP all participants from ALL conferences! Are you sure?')) {
@@ -1337,7 +1234,7 @@ $(document).ready(function () {
     });
 
     //This adds all codecs and loops to the required conferences
-    $(document).on('click', '.setupAll', function () {
+    $(document).on('mousedown', '.setupAll', function () {
         //post this information to refresher.php to take action
         //if (confirm('This will ADD all codecs and loops to ALL conferences! Are you sure?')) {
         $.ajax({
@@ -1357,7 +1254,7 @@ $(document).ready(function () {
     });
 
     //This resets all panes in the MCU
-    $(document).on('click', '.clearPanePlacement', function () {
+    $(document).on('mousedown', '.clearPanePlacement', function () {
         //post this information to refresher.php to take action
         if (confirm('This will reset all pane placement information and WILL change the video layout! Are you sure?')) {
             $.ajax({
@@ -1455,9 +1352,9 @@ $(document).ready(function () {
         }
 
     });
-    
-	//Switch to important view within a codec
-    $(document).on('click', '.setImportantParticipant', function () {
+
+    //Switch to important view within a codec
+    $(document).on('mousedown', '.setImportantParticipant', function () {
         var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).closest("tr").find(".displayName").data("conferencename"), scrubbedParticipantList = {}, layoutType = "important", currentPane = parseInt($(this).closest("tr").find(".displayName").data("panenumber"));
 
         //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
@@ -1474,11 +1371,11 @@ $(document).ready(function () {
             }
         });
 
-		setSpecialLayout(scrubbedParticipantList, participantName, participantProtocol, participantType, conferenceName, layoutType);
-		
+        setSpecialLayout(scrubbedParticipantList, participantName, participantProtocol, participantType, conferenceName, layoutType);
+
     });
-	
-	$(document).on('click', '.setFocusParticipant', function () {
+
+    $(document).on('mousedown', '.setFocusParticipant', function () {
         var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).closest("tr").find(".displayName").data("conferencename"), scrubbedParticipantList = {}, layoutType = "focus", currentPane = parseInt($(this).closest("tr").find(".displayName").data("panenumber"));
 
         //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
@@ -1494,12 +1391,12 @@ $(document).ready(function () {
 
             }
         });
-        
-		setSpecialLayout(scrubbedParticipantList, participantName, participantProtocol, participantType, conferenceName, layoutType);
-		
+
+        setSpecialLayout(scrubbedParticipantList, participantName, participantProtocol, participantType, conferenceName, layoutType);
+
     });
-    
-    $(document).on('click', '.specialLayout', function () {
+
+    $(document).on('mousedown', '.specialLayout', function () {
         var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).closest("tr").find(".displayName").data("conferencename"), scrubbedParticipantList = {}, layoutType = "", currentPane = parseInt($(this).closest("tr").find(".displayName").data("panenumber"));
 
         //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
@@ -1515,20 +1412,20 @@ $(document).ready(function () {
 
             }
         });
-        
+
         if (currentPane == 0) {
             layoutType = "transferFocus";
         } else {
             layoutType = "important";
         }
 
-        
+
         setSpecialLayout(scrubbedParticipantList, participantName, participantProtocol, participantType, conferenceName, layoutType);
-		
+
     });
 
-	//Go back to default view from important view
-    $(document).on('click', '.resetspecialLayout', function () {
+    //Go back to default view from important view
+    $(document).on('mousedown', '.resetspecialLayout', function () {
         var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).closest("tr").find(".displayName").data("conferencename"), scrubbedParticipantList = {};
 
         //build a new scrubbed variable that contains only the participant information from the conference which we are moving participants
@@ -1545,29 +1442,23 @@ $(document).ready(function () {
         });
 
         $.ajax({
-			type: "POST",
-			url: "refresher.php",
-			data: {action: "resetSpecialLayout", scrubbedParticipantList: scrubbedParticipantList, participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName},
-			dataType: "json",
-			cache: false,
+            type: "POST",
+            url: "refresher.php",
+            data: {action: "resetSpecialLayout", scrubbedParticipantList: scrubbedParticipantList, participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName},
+            dataType: "json",
+            cache: false,
 
-			success: function (r) {
-				if (r.alert) {
-					console.log(r.alert);
-				}
-			}
-		});
+            success: function (r) {
+                if (r.alert) {
+                    console.log(r.alert);
+                }
+            }
+        });
 
     });
-    
+
     $("*").dblclick(function(e){
         e.preventDefault();
     });
 
 });
-
-//Sends post info to refresher.php
-$.customPOST = function (data, callback) {
-    "use strict";
-    $.post('refresher.php', data, callback, 'json');
-};

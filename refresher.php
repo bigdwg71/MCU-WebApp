@@ -5,45 +5,45 @@ require_once 'functions.php';
 
 //This is a dummy post that is sent by the javascript in a loop,
 //we just have this here so this script can deal with other button presses too.
-if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
-    refreshPage($mcuUsername, $mcuPassword, $_POST['type']);
+if (isset($_POST['action']) && $_POST['action'] == '') {
+    //not sure why this is here
+} elseif (isset($_POST['action']) && $_POST['action'] == 'refreshWeb') {
+    if ($_POST['type'] == 'first') {
+        writeConferenceEnumerate($mcuUsername, $mcuPassword);
+        writeParticipantEnumerate($mcuUsername, $mcuPassword);
+        writePanesDB($mcuUsername, $mcuPassword);
+    }
+    refreshWeb($mcuUsername, $mcuPassword);
+} elseif (isset($_POST['action']) && $_POST['action'] == 'writeParticipantEnumerate') {
+    writeParticipantEnumerate($mcuUsername, $mcuPassword);
+} elseif (isset($_POST['action']) && $_POST['action'] == 'writeConferenceEnumerate') {
+    writeConferenceEnumerate($mcuUsername, $mcuPassword);
+} elseif (isset($_POST['action']) && $_POST['action'] == 'writePanesDB') {
+    writePanesDB($mcuUsername, $mcuPassword);
 } elseif (isset($_POST['action']) && $_POST['action'] == 'transfer') {
 
     //Passes variables scrubbedParticipantList, sourceConference, sourceType, destinationConference, destType
 
-    $checkLoop = null;
-    $checkMove = null;
-    $checkDrop = null;
-    $checkAdd = null;
-    $checkImportant = null;
-
-    $destConference = $_POST['destinationConference'];
-    $sourceConference = $_POST['sourceConference'];
+    $destConferenceName = $_POST['destinationConference'];
+    $sourceConferenceName = $_POST['sourceConference'];
     $destType = $_POST['destType'];
     $sourceType = $_POST['sourceType'];
 
     $participantList = $_POST['scrubbedParticipantList'];
-    
-    //Performing some operations outside of the loop to reduce DB queries
 
-    //Get conference info of the source conference
-    $sourceConferenceInfo = databaseQuery('conferenceInfo', $sourceConference);
-
-    //Collect information about the destination conference
-    $destConferenceInfo = databaseQuery('conferenceInfo', $destConference);
-
-    //Set conferenceTableId for both source and destination conferences
+    //get the conference IDs to allow for pane and participant queries
+    $sourceConferenceInfo = databaseQuery('conferenceInfo', $sourceConferenceName);
     $sourceConferenceTableId = $sourceConferenceInfo['id'];
+
+    $destConferenceInfo = databaseQuery('conferenceInfo', $destConferenceName);
     $destConferenceTableId = $destConferenceInfo['id'];
 
     //Get particpant info of the existing loop in the conference for use later in the function
-    $existingLoop = "";
-    $findLoop['displayName'] = "_";
-    $findLoop['conferenceId'] = $sourceConferenceTableId;
-    $existingLoop = databaseQuery('participantInfo', $findLoop);
+    $findLoop['conferenceTableId'] = $sourceConferenceTableId;
+    $conferenceLoop = databaseQuery('findConferenceLoop', $findLoop);
 
     //If there is no loop in the conference, then add one here
-    if ($existingLoop['participantName'] == "" && $sourceType != "waiting") {
+    if ($conferenceLoop['participantName'] == "" && $sourceType != "waiting") {
 
         //Add loop to grid conference
         $addNewLoop = mcuCommand(
@@ -51,7 +51,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
             'add',
             array('authenticationUser' => $mcuUsername,
                   'authenticationPassword' => $mcuPassword,
-                  'conferenceName' => $sourceConference,
+                  'conferenceName' => $sourceConferenceName,
                   'participantProtocol' => 'sip',
                   'participantName' => 'WOA - Loop',
                   'participantType' => 'ad_hoc',
@@ -63,21 +63,19 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         );
 
         //Use the response to populate the existingLoop variable to eliminate issues with adding loop and waiting for enumerate
-        $existingLoop = $addNewLoop['participant'];
+        $conferenceLoop = $addNewLoop['participant'];
     }
 
     //For each participant in the scrubbedParticipantList variable, we will transfer with all associated actions (one or many)
     foreach ($participantList as $participant) {
 
         //Set participant specific variables
-        $displayName = $participant['displayName'];
         $participantName = $participant['participantName'];
         $participantProtocol = $participant['participantProtocol'];
         $participantType = $participant['participantType'];
 
         //Get Participant info of the moving participant to update the Pane Placement database
-        $findPaticipant['displayName'] = addslashes($displayName);
-        $findPaticipant['conferenceId'] = $sourceConferenceInfo['id'];
+        $findPaticipant['participantName'] = $participantName;
         $participantInfo = databaseQuery('participantInfo', $findPaticipant);
 
         //Set variables for SQL queries in following actions
@@ -85,26 +83,29 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
 
         $participantPaneTarget = 0;
 
+        //if the source conference is a grid, then we need to save their current pane if they have one, replace them with a loop, then move them to the new conference
         if ($sourceType == "grid") {
 
             //find if the participant has been assigned a pane in their source conference to add a loop
-            $sourcePane['action'] = 'findPane';
-            $sourcePane['conferenceTableId'] = $sourceConferenceTableId;
-            $sourcePane['participantTableId'] = $participantTableId;
-            $sourcePaneResult = mysqli_fetch_array(databaseQuery('paneUpdate', $sourcePane));
-
-            if (isset($sourcePaneResult['pane'])) {
-                $loopPaneTarget = intval($sourcePaneResult['pane']);
+            $currentPane['action'] = 'currentPane';
+            $currentPane['conferenceTableId'] = $sourceConferenceTableId;
+            $currentPane['participantTableId'] = $participantTableId;
+            $currentPaneResult = databaseQuery('panePlacementUpdate', $currentPane);
+            /*
+            if (isset($currentPaneResult['pane'])) {
+                $loopPaneTarget = $currentPaneResult['pane'];
             }
+            */
+            //replace participant with a loop
+            if ($currentPaneResult !== 0) {
+                $loopPaneTarget = $currentPaneResult;
 
-            if (isset($loopPaneTarget)) {
                 //Build information for paneUpdate in the panePlacement database
-                $addLoop['action'] = "addLoop";
-                $addLoop['pane'] = $loopPaneTarget;
-                $addLoop['conferenceTableId'] = $sourceConferenceTableId;
-                $addLoop['participantTableId'] = $participantTableId;
-                $addLoop['loopParticipantId'] = $existingLoop['participantName'];
-                $addLoopResult = databaseQuery('paneUpdate', $addLoop);
+                $setLoop['action'] = "setLoop";
+                $setLoop['conferenceTableId'] = $sourceConferenceTableId;
+                $setLoop['participantTableId'] = $participantTableId;
+                $setLoop['loopParticipantName'] = $conferenceLoop['participantName'];
+                $setLoopResult = databaseQuery('panePlacementUpdate', $setLoop);
 
                 //set the existing loop to take participant's old pane
                 $setLoopPane = mcuCommand(
@@ -112,21 +113,20 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                     'modify',
                     array('authenticationUser' => $mcuUsername,
                         'authenticationPassword' => $mcuPassword,
-                        'conferenceName' => $sourceConference,
+                        'conferenceName' => $sourceConferenceName,
                         'enabled' => true,
                         'panes' => array(['index' => $loopPaneTarget,
                                           'type' => 'participant',
-                                          'participantName' => $existingLoop['participantName'],
-                                          'participantProtocol' => $existingLoop['participantProtocol'],
-                                          'participantType' => $existingLoop['participantType']]))
+                                          'participantName' => $conferenceLoop['participantName'],
+                                          'participantProtocol' => $conferenceLoop['participantProtocol'],
+                                          'participantType' => $conferenceLoop['participantType']]))
                 );
 
                 if ($setLoopPane['panesModified'] != 1) {
-                    $removeLoop['action'] = "removeLoop";
-                    $removeLoop['pane'] = $loopPaneTarget;
-                    $removeLoop['conferenceTableId'] = $sourceConferenceTableId;
-                    $removeLoopResult = databaseQuery('paneUpdate', $removeLoop);
-                    //$removeTest = 'I removed the bloody loop!';
+                    $unsetLoop['action'] = "unsetLoop";
+                    $unsetLoop['participantTableId'] = $participantTableId;
+                    $unsetLoop['conferenceTableId'] = $sourceConferenceTableId;
+                    $unsetLoopResult = databaseQuery('panePlacementUpdate', $unsetLoop);
                 }
 
             }
@@ -135,40 +135,39 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         if ($destType == "grid") {
             //check if paneplacement has entry saved
             //set variables for use in DB query
-            $destPane['action'] = 'findPane';
-            $destPane['conferenceTableId'] = $destConferenceTableId;
-            $destPane['participantTableId'] = $participantTableId;
+            $currentPane['action'] = 'currentPane';
+            $currentPane['conferenceTableId'] = $destConferenceTableId;
+            $currentPane['participantTableId'] = $participantTableId;
 
             //Check if the participant has an existing DB entry so we can put them back in the proper pane
-            $destPaneResult = mysqli_fetch_array(databaseQuery('paneUpdate', $destPane));
+            $currentPaneResult = databaseQuery('panePlacementUpdate', $currentPane);
 
             //If we receive a result from the DB, then set it as the target pane
-            if (isset($destPaneResult['pane'])) {
-                $participantPaneTarget = intval($destPaneResult['pane']);
+            if ($currentPaneResult !== 0) {
+                $participantPaneTarget = $currentPaneResult;
 
-                //Build information necesary to remove loopParticipantId from panePlacement Table
-                $removeLoop['action'] = "removeLoop";
-                $removeLoop['pane'] = $participantPaneTarget;
-                $removeLoop['conferenceTableId'] = $destConferenceTableId;
-                $removeLoopResult = databaseQuery('paneUpdate', $removeLoop);
+                //Build information necesary to remove loopParticipantName from panePlacement Table
+                $unsetLoop['action'] = "unsetLoop";
+                $unsetLoop['participantTableId'] = $participantTableId;
+                $unsetLoop['conferenceTableId'] = $destConferenceTableId;
+                $unsetLoopResult = databaseQuery('panePlacementUpdate', $unsetLoop);
 
             } else {
                 //If there is no pane placement entry for the participant
                 //in the destination conference, we will find the first available pane and use it
-                $findEmpty['action'] = "findEmpty";
-                $findEmpty['conferenceTableId'] = $destConferenceTableId;
-                $findEmptyResult = databaseQuery('paneUpdate', $findEmpty);
+                $findAvailablePane['action'] = "findAvailablePane";
+                $findAvailablePane['conferenceTableId'] = $destConferenceTableId;
+                $findAvailablePaneResult = databaseQuery('panePlacementUpdate', $findAvailablePane);
 
-                if ($findEmptyResult != 0) {
-                    $participantPaneTarget = intval($findEmptyResult);
+                if ($findAvailablePaneResult != 0) {
+                    $participantPaneTarget = $findAvailablePaneResult;
 
                     //Now we need to write the new pane ownership information to the panePlacement table
-                    //We may want to move this until after the actual MCU commands, but in my testing, that lead to multiple assignments to the same pane in the DB
-                    $assignPane['action'] = "add";
-                    $assignPane['pane'] = $participantPaneTarget;
-                    $assignPane['conferenceTableId'] = $destConferenceTableId;
-                    $assignPane['participantTableId'] = $participantTableId;
-                    $assignPaneResult = databaseQuery('paneUpdate', $assignPane);
+                    $addPaneEntry['action'] = "addPaneEntry";
+                    $addPaneEntry['pane'] = $participantPaneTarget;
+                    $addPaneEntry['conferenceTableId'] = $destConferenceTableId;
+                    $addPaneEntry['participantTableId'] = $participantTableId;
+                    $addPaneEntryResult = databaseQuery('panePlacementUpdate', $addPaneEntry);
                 }
             }
 
@@ -178,13 +177,14 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                 'move',
                 array('authenticationUser' => $mcuUsername,
                       'authenticationPassword' => $mcuPassword,
-                      'conferenceName' => $sourceConference,
+                      'conferenceName' => $sourceConferenceName,
                       'participantName' => $participantName,
                       'participantProtocol' => $participantProtocol,
                       'participantType' => $participantType,
-                      'newConferenceName' => $destConference)
+                      'newConferenceName' => $destConferenceName)
             );
 
+            //Now set the correct pane for the participant
             if ($participantPaneTarget > 0 && $participantPaneTarget <= 20) {
                 //Set participant to the appropriate pane
                 $setParticipantPane = mcuCommand(
@@ -192,7 +192,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                     'modify',
                     array('authenticationUser' => $mcuUsername,
                           'authenticationPassword' => $mcuPassword,
-                          'conferenceName' => $destConference,
+                          'conferenceName' => $destConferenceName,
                           'enabled' => true,
                           'panes' => array(['index' => $participantPaneTarget,
                                             'type' => 'participant',
@@ -200,14 +200,6 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                                             'participantProtocol' => $participantProtocol,
                                             'participantType' => $participantType]))
                 );
-
-                if ($setParticipantPane['panesModified'] != 1) {
-                    $removeLoop['action'] = "removeLoop";
-                    $removeLoop['pane'] = $participantPaneTarget;
-                    $removeLoop['conferenceTableId'] = $destConferenceTableId;
-                    $removeLoopResult = databaseQuery('paneUpdate', $removeLoop);
-                }
-
             }
 
             $query['name'] = 'showIsLive';
@@ -226,7 +218,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                     'modify',
                     array('authenticationUser' => $mcuUsername,
                           'authenticationPassword' => $mcuPassword,
-                          'conferenceName' => $destConference,
+                          'conferenceName' => $destConferenceName,
                           'participantName' => $participantName,
                           'participantProtocol' => $participantProtocol,
                           'participantType' => $participantType,
@@ -239,27 +231,27 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
 
                 //if the show is live/taping, then set a single pane layout for participant
                 $cpLayout = 'layout1';
-				$codec = codecInfo($destConference);
+                $codec = databaseQuery('codecInfo', $destConferenceName);
 
                 //Set the layout for the participant
-				$setCPLayout = mcuCommand(
+                $setCPLayout = mcuCommand(
                         array('prefix' => 'participant.'),
                         'modify',
                         array('authenticationUser' => $mcuUsername,
                           'authenticationPassword' => $mcuPassword,
-                          'conferenceName' => $destConference,
+                          'conferenceName' => $destConferenceName,
                           'participantName' => $participantName,
                           'participantProtocol' => $participantProtocol,
                           'participantType' => $participantType,
                               'operationScope' => 'activeState',
                               'cpLayout' => $cpLayout,
                               'focusType' => 'participant',
-							  'focusParticipant' =>
-									array('participantName' => $codec['participantName'],
-									'participantProtocol' => $codec['participantProtocol'],
-									'participantType' => $codec['participantType'])
-						)
-					);
+                              'focusParticipant' =>
+                                    array('participantName' => $codec['participantName'],
+                                    'participantProtocol' => $codec['participantProtocol'],
+                                    'participantType' => $codec['participantType'])
+                        )
+                    );
             }
 
         } elseif ($destType == "focus") {
@@ -269,11 +261,11 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                 'move',
                 array('authenticationUser' => $mcuUsername,
                       'authenticationPassword' => $mcuPassword,
-                      'conferenceName' => $sourceConference,
+                      'conferenceName' => $sourceConferenceName,
                       'participantName' => $participantName,
                       'participantProtocol' => $participantProtocol,
                       'participantType' => $participantType,
-                      'newConferenceName' => $destConference)
+                      'newConferenceName' => $destConferenceName)
             );
             //set moved participant to important
             $checkImportant = mcuCommand(
@@ -281,7 +273,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                 'modify',
                 array('authenticationUser' => $mcuUsername,
                       'authenticationPassword' => $mcuPassword,
-                      'conferenceName' => $destConference,
+                      'conferenceName' => $destConferenceName,
                       'participantName' => $participantName,
                       'participantProtocol' => $participantProtocol,
                       'participantType' => $participantType,
@@ -295,15 +287,12 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                 'move',
                 array('authenticationUser' => $mcuUsername,
                       'authenticationPassword' => $mcuPassword,
-                      'conferenceName' => $sourceConference,
+                      'conferenceName' => $sourceConferenceName,
                       'participantName' => $participantName,
                       'participantProtocol' => $participantProtocol,
                       'participantType' => $participantType,
-                      'newConferenceName' => $destConference)
+                      'newConferenceName' => $destConferenceName)
             );
-
-            //when moving someone into the waiting room, set them to family4 layout
-            //$cpLayout = 'family4';
 
             //Set the layout for the participant that has been moved
             $setCPLayout = mcuCommand(
@@ -311,7 +300,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                 'modify',
                 array('authenticationUser' => $mcuUsername,
                       'authenticationPassword' => $mcuPassword,
-                      'conferenceName' => $destConference,
+                      'conferenceName' => $destConferenceName,
                       'participantName' => $participantName,
                       'participantProtocol' => $participantProtocol,
                       'participantType' => $participantType,
@@ -321,58 +310,99 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
             );
         }
 
+        //Move the participant in the database
+        $moveParticipant['action'] = "moveParticipant";
+        $moveParticipant['conferenceTableId'] = $destConferenceTableId;
+        $moveParticipant['participantTableId'] = $participantTableId;
+        $moveParticipantResult = databaseQuery('participantUpdate', $moveParticipant);
+
     }
 
-    echo json_encode(array('alert' => '', 'refresh' => false));
+    echo json_encode(array('alert' => '', 'refresh' => ''));
 
 } elseif (isset($_POST['action']) && $_POST['action'] == 'muteCommand') {
 
+    $scrubbedParticipantList = $_POST['scrubbedParticipantList'];
     $conferenceName = $_POST['conferenceName'];
-    $participantName = $_POST['participantName'];
-    $participantProtocol = $_POST['participantProtocol'];
-    $participantType = $_POST['participantType'];
-    $operationScope = $_POST['operationScope'];
-    
     $muteChannel = $_POST['muteChannel'];
 
+    $conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
+    $conferenceTableId = $conferenceInfo['id'];
+
     if ($_POST['muteAction'] == 'mute') {
-        $muteAction = true;
+        $muteAction = TRUE;
     } elseif ($_POST['muteAction'] == 'unmute') {
-        $muteAction = false;
+        $muteAction = FALSE;
     }
 
-    if ($muteChannel == 'txAll') {
+    foreach ($scrubbedParticipantList as $participant) {
 
-        $result = mcuCommand(
-            array('prefix' => 'participant.'),
-            'modify',
-            array('authenticationUser' => $mcuUsername,
-                  'authenticationPassword' => $mcuPassword,
-                  'conferenceName' => $conferenceName,
-                  'participantName' => $participantName,
-                  'participantProtocol' => $participantProtocol,
-                  'participantType' => $participantType,
-                  'operationScope' => $operationScope,
-                  'audioTxMuted' => $muteAction,
-                  'videoTxMuted' => $muteAction)
-        );
+        $participantName = $participant['participantName'];
+        $participantProtocol = $participant['participantProtocol'];
+        $participantType = $participant['participantType'];
+        $operationScope = 'activeState';
 
-    } else {
-        $result = mcuCommand(
-            array('prefix' => 'participant.'),
-            'modify',
-            array('authenticationUser' => $mcuUsername,
-                  'authenticationPassword' => $mcuPassword,
-                  'conferenceName' => $conferenceName,
-                  'participantName' => $participantName,
-                  'participantProtocol' => $participantProtocol,
-                  'participantType' => $participantType,
-                  'operationScope' => $operationScope,
-                  $muteChannel => $muteAction)
-        );
+        //Get Participant info of the participant we are muting
+        $findPaticipant['participantName'] = $participantName;
+        $participantInfo = databaseQuery('participantInfo', $findPaticipant);
+        $participantTableId = $participantInfo['id'];
+
+        if ($muteChannel == 'txAll') {
+
+            $result = mcuCommand(
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                      'authenticationPassword' => $mcuPassword,
+                      'conferenceName' => $conferenceName,
+                      'participantName' => $participantName,
+                      'participantProtocol' => $participantProtocol,
+                      'participantType' => $participantType,
+                      'operationScope' => $operationScope,
+                      'audioTxMuted' => $muteAction,
+                      'videoTxMuted' => $muteAction)
+            );
+
+            //Mute the participant in the database
+            $muteParticipant['action'] = "muteParticipant";
+            $muteParticipant['conferenceTableId'] = $conferenceTableId;
+            $muteParticipant['participantTableId'] = $participantTableId;
+            $muteParticipant['muteChannel'] = 'audioTxMuted';
+            $muteParticipant['muteAction'] = $muteAction;
+            $muteParticipantResult = databaseQuery('participantUpdate', $muteParticipant);
+
+            $muteParticipant['action'] = "muteParticipant";
+            $muteParticipant['conferenceTableId'] = $conferenceTableId;
+            $muteParticipant['participantTableId'] = $participantTableId;
+            $muteParticipant['muteChannel'] = 'videoTxMuted';
+            $muteParticipant['muteAction'] = $muteAction;
+            $muteParticipantResult = databaseQuery('participantUpdate', $muteParticipant);
+
+        } else {
+            $result = mcuCommand(
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                      'authenticationPassword' => $mcuPassword,
+                      'conferenceName' => $conferenceName,
+                      'participantName' => $participantName,
+                      'participantProtocol' => $participantProtocol,
+                      'participantType' => $participantType,
+                      'operationScope' => $operationScope,
+                      $muteChannel => $muteAction)
+            );
+
+            //Mute the participant in the database
+            $muteParticipant['action'] = "muteParticipant";
+            $muteParticipant['conferenceTableId'] = $conferenceTableId;
+            $muteParticipant['participantTableId'] = $participantTableId;
+            $muteParticipant['muteChannel'] = $muteChannel;
+            $muteParticipant['muteAction'] = $muteAction;
+            $muteParticipantResult = databaseQuery('participantUpdate', $muteParticipant);
+        }
+
     }
 
-    //echo json_encode(array('alert' => $result));
     echo json_encode(array('alert' => ''));
 
 } elseif (isset($_POST['action']) && $_POST['action'] == 'drop') {
@@ -381,7 +411,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
     $participantName = $_POST['participantName'];
     $participantProtocol = $_POST['participantProtocol'];
     $participantType = $_POST['participantType'];
-    
+
     $result = mcuCommand(
         array('prefix' => 'participant.'),
         'remove',
@@ -392,43 +422,63 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
               'participantProtocol' => $participantProtocol,
               'participantType' => $participantType)
     );
+    
+    $findPaticipant['participantName'] = $participantName;
+    $participantInfo = databaseQuery('participantInfo', $findPaticipant);
+    $participantTableId = $participantInfo['id'];
+    
+    //Make the participant important the database
+    $dropParticipant['action'] = "drop";
+    $dropParticipant['participantTableId'] = $participantTableId;
+    $dropParticipantResult = databaseQuery('participantUpdate', $dropParticipant);
+    
 } elseif (isset($_POST['action']) && $_POST['action'] == 'changeLayout') {
     $conferenceName = $_POST['conferenceName'];
     $customLayout = intval($_POST['layoutNumber']);
-	
-	$query['name'] = 'showIsLive';
-	$showIsLive = filter_var(databaseQuery('readIntSetting', $query), FILTER_VALIDATE_BOOLEAN);
 
-	if ($showIsLive == true) {
+    $query['name'] = 'showIsLive';
+    $showIsLive = filter_var(databaseQuery('readIntSetting', $query), FILTER_VALIDATE_BOOLEAN);
 
-		$result = mcuCommand(
-			array('prefix' => 'conference.'),
-			'modify',
-			array('authenticationUser' => $mcuUsername,
-				  'authenticationPassword' => $mcuPassword,
-				  'conferenceName' => $conferenceName,
-				  'customLayoutEnabled' => true,
-				  'customLayout' => $customLayout)
-		);
-		
-	} else {
-		
-		$result = mcuCommand(
-			array('prefix' => 'conference.'),
-			'modify',
-			array('authenticationUser' => $mcuUsername,
-				  'authenticationPassword' => $mcuPassword,
-				  'conferenceName' => $conferenceName,
-				  'customLayoutEnabled' => true,
-				  'customLayout' => $customLayout,
-				  'setAllParticipantsToCustomLayout' => true,
-				  'newParticipantsCustomLayout' => true)
-		);
-		
-	}
+    if ($showIsLive == true) {
+
+        $result = mcuCommand(
+            array('prefix' => 'conference.'),
+            'modify',
+            array('authenticationUser' => $mcuUsername,
+                  'authenticationPassword' => $mcuPassword,
+                  'conferenceName' => $conferenceName,
+                  'customLayoutEnabled' => true,
+                  'customLayout' => $customLayout)
+        );
+
+    } else {
+
+        $result = mcuCommand(
+            array('prefix' => 'conference.'),
+            'modify',
+            array('authenticationUser' => $mcuUsername,
+                  'authenticationPassword' => $mcuPassword,
+                  'conferenceName' => $conferenceName,
+                  'customLayoutEnabled' => true,
+                  'customLayout' => $customLayout,
+                  'setAllParticipantsToCustomLayout' => true,
+                  'newParticipantsCustomLayout' => true)
+        );
+
+    }
     
+    //Get conference info and ID
+    $conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
+    $conferenceTableId = $conferenceInfo['id'];
+
+    //Make the participant non-important the database
+    $changeLayout['action'] = "changeLayout";
+    $changeLayout['conferenceTableId'] = $conferenceTableId;
+    $changeLayout['layout'] = $customLayout;
+    $changeLayoutResult = databaseQuery('conferenceUpdate', $changeLayout);
+
     if ($customLayout === 1) {
-        $setPaneBlank = mcuCommand(
+        $addPaneEntryBlank = mcuCommand(
                 array('prefix' => 'conference.paneplacement.'),
                 'modify',
                     array('authenticationUser' => $mcuUsername,
@@ -481,9 +531,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                         )
             );
         }
-	
-    //$panePlacement = checkPanePlacement($conferenceName, $mcuUsername, $mcuPassword);
-    
+
     echo json_encode(array('alert' => ''));
 
 //DialOut
@@ -630,7 +678,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
             $codecDN = databaseQuery('readSetting', $codecID);
             $confLayout = $conf['customLayout'];
             $conferenceName = $conf['conferenceName'];
-			
+
             if ($codecDN == 0) {
                 $addLoop = false;
                 $addCodec = false;
@@ -653,7 +701,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                     }
                 }
             }
-            
+
             if ($confLayout == 33 || $confLayout == 23) {
                 $data['action'] = 'get';
                 $data['conferenceName'] = $conferenceName;
@@ -721,28 +769,28 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                           'operationScope' => 'activeState',
                           'cpLayout' => 'conferenceCustom')
                 );
+
+
+                $waitingRoom = databaseQuery('readSetting', 'waitingRoom');
+
+                if ($conf['conferenceName'] == $waitingRoom) {
+
+                    //Set the layout of the codec in the waitingRoom
+                    $setCPLayout = mcuCommand(
+                        array('prefix' => 'participant.'),
+                        'modify',
+                        array('authenticationUser' => $mcuUsername,
+                              'authenticationPassword' => $mcuPassword,
+                              'conferenceName' => $conf['conferenceName'],
+                              'participantName' => $resultCodec['participant']['participantName'],
+                              'participantProtocol' => $resultCodec['participant']['participantProtocol'],
+                              'participantType' => $resultCodec['participant']['participantType'],
+                              'operationScope' => 'activeState',
+                              'cpLayout' => 'conferenceCustom',
+                              'focusType' => 'voiceActivated')
+                    );
+                }
             }
-
-            $waitingRoom = databaseQuery('readSetting', 'waitingRoom');
-
-            if ($conf['conferenceName'] == $waitingRoom) {
-
-                //Set the layout of the codec in the waitingRoom
-                $setCPLayout = mcuCommand(
-                    array('prefix' => 'participant.'),
-                    'modify',
-                    array('authenticationUser' => $mcuUsername,
-                          'authenticationPassword' => $mcuPassword,
-                          'conferenceName' => $conf['conferenceName'],
-                          'participantName' => $resultCodec['participant']['participantName'],
-                          'participantProtocol' => $resultCodec['participant']['participantProtocol'],
-                          'participantType' => $resultCodec['participant']['participantType'],
-                          'operationScope' => 'activeState',
-                          'cpLayout' => 'conferenceCustom',
-                          'focusType' => 'voiceActivated')
-                );
-            }
-
 
             //Add Loop
             if ($addLoop == true && $conf['conferenceName'] != $waitingRoom) {
@@ -765,17 +813,17 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         }
 
     }
-    
+
     echo json_encode(array('alert' => ''));
 
 //Clears all pane placement entries and resets all conferences and all panes to default
 } elseif (isset($_POST['action']) && $_POST['action'] == 'clearPanePlacement') {
-    
+
     $conferenceList = $_POST['conferenceList'];
-        
+
     foreach ($conferenceList as $conf) {
         //Reset all panes in each conference
-        $setPaneBlank = mcuCommand(
+        $addPaneEntryBlank = mcuCommand(
             array('prefix' => 'conference.paneplacement.'),
             'modify',
                 array('authenticationUser' => $mcuUsername,
@@ -829,11 +877,11 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         );
     }
 
-    $clearAllPanes['action'] = "clearPanePlacement";
-    $clearAllPanesResult = databaseQuery('paneUpdate', $clearAllPanes);
-    
+    $clearPanePlacement['action'] = "clearPanePlacement";
+    $clearPanePlacementResult = databaseQuery('panePlacementUpdate', $clearPanePlacement);
+
     echo json_encode(array('alert' => ''));
-    
+
 // Someone clicked the teardown button
 } elseif (isset($_POST['action']) && $_POST['action'] == 'teardown') {
     $participantList = $_POST['participantList'];
@@ -850,12 +898,12 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                   'participantType' => $row['participantType'])
         );
     }
-    
+
     $conferenceList = $_POST['conferenceList'];
-        
+
     foreach ($conferenceList as $conf) {
         //Reset all panes in each conference
-        $setPaneBlank = mcuCommand(
+        $addPaneEntryBlank = mcuCommand(
             array('prefix' => 'conference.paneplacement.'),
             'modify',
                 array('authenticationUser' => $mcuUsername,
@@ -910,9 +958,9 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
     }
 
     //Set showIsLive variable in DB to FALSE
-    $query['name'] = 'showIsLive';
-    $query['value'] = 'false';
-    $result = databaseQuery('writeIntSetting', $query);
+    //$query['name'] = 'showIsLive';
+    //$query['value'] = 'false';
+    //$result = databaseQuery('writeIntSetting', $query);
 
     echo json_encode(array('alert' => ''));
 
@@ -925,7 +973,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
     $result = databaseQuery('writeIntSetting', $query);
 
     $waitingRoom = databaseQuery('readSetting', 'waitingRoom');
-	
+
     $conferenceList = $_POST['conferenceList'];
     $participantList = $_POST['participantList'];
 
@@ -951,7 +999,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                               'operationScope' => 'activeState',
                               'cpLayout' => 'conferenceCustom',
                               'focusType' => 'voiceActivated'
-							  )
+                              )
                     );
                 }
             }
@@ -981,8 +1029,9 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
 
         $currentConference = $conf['conferenceName'];
         $confLayout = $conf['customLayout'];
-		
-		$codec = codecInfo($currentConference);
+
+
+        $codec = databaseQuery('codecInfo', $currentConference);
 
         //if the conference is in a single pane configuration, then skip
         if ($confLayout != 1 && $currentConference != $waitingRoom) {
@@ -1000,13 +1049,13 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                               'operationScope' => 'activeState',
                               'cpLayout' => $cpLayout,
                               'focusType' => 'participant',
-							  'focusParticipant' =>
-									array('participantName' => $codec['participantName'],
-									'participantProtocol' => $codec['participantProtocol'],
-									'participantType' => $codec['participantType'])
-						)
-					);
-				}
+                              'focusParticipant' =>
+                                    array('participantName' => $codec['participantName'],
+                                    'participantProtocol' => $codec['participantProtocol'],
+                                    'participantType' => $codec['participantType'])
+                        )
+                    );
+                }
             }
         }
     }
@@ -1041,10 +1090,10 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         );
 
         //After we set the pane to default, blank, type, or loudest, delete the entry for that pane in the panePlacement table
-        $deletePane['action'] = "delete";
-        $deletePane['pane'] = $pane;
-        $deletePane['conferenceTableId'] = $conferenceTableId;
-        $deletePaneResult = databaseQuery('paneUpdate', $deletePane);
+        $deletePaneEntry['action'] = "deletePaneEntry";
+        $deletePaneEntry['pane'] = $pane;
+        $deletePaneEntry['conferenceTableId'] = $conferenceTableId;
+        $deletePaneEntryResult = databaseQuery('panePlacementUpdate', $deletePaneEntry);
 
     //if they changed it to be a participant
     } elseif ($type == "participant") {
@@ -1056,14 +1105,13 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         $participantType = $_POST['participantType'];
 
         //Get Participant info of the moving participant to update the Pane Placement database
-        $findPaticipant['displayName'] = addslashes($displayName);
-        $findPaticipant['conferenceId'] = $conferenceTableId;
+        $findPaticipant['participantName'] = $participantName;
         $participantInfo = databaseQuery('participantInfo', $findPaticipant);
 
         //Set variables for SQL queries in following actions
         $participantTableId = $participantInfo['id'];
 
-        $setPane = mcuCommand(
+        $addPaneEntry = mcuCommand(
             array('prefix' => 'conference.paneplacement.'),
             'modify',
             array('authenticationUser' => $mcuUsername,
@@ -1076,38 +1124,45 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                                     'participantType' => $participantType]))
         );
 
-        $updatePane['action'] = "update";
+        $updatePane['action'] = "updatePane";
         $updatePane['pane'] = $pane;
         $updatePane['conferenceTableId'] = $conferenceTableId;
         $updatePane['participantTableId'] = $participantTableId;
-        $updatePaneResult = databaseQuery('paneUpdate', $updatePane);
+        $updatePaneResult = databaseQuery('panePlacementUpdate', $updatePane);
 
     }
     echo json_encode(array('alert' => '' ));
+
 } elseif (isset($_POST['action']) && $_POST['action'] == 'setSpecialLayout') {
-    	
-	$conferenceName = $_POST['conferenceName'];
-	$participantName = $_POST['participantName'];
-	$participantProtocol = $_POST['participantProtocol'];
-	$participantType = $_POST['participantType'];
-	$scrubbedParticipantList = $_POST['scrubbedParticipantList'];
-	$layoutType = $_POST['layoutType'];
+
+    $conferenceName = $_POST['conferenceName'];
+    $participantName = $_POST['participantName'];
+    $participantProtocol = $_POST['participantProtocol'];
+    $participantType = $_POST['participantType'];
+    $scrubbedParticipantList = $_POST['scrubbedParticipantList'];
+    $layoutType = $_POST['layoutType'];
     $conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
     $conferenceTableId = $conferenceInfo['id'];
     $currentLayout = filter_var($conferenceInfo['layout'], FILTER_VALIDATE_INT);
 
-	if ($layoutType === 'focus' || $layoutType === 'transferFocus') {
-		$customLayout = 33;
-	} else if ($layoutType === 'important') {
-		if ($currentLayout === 3 || $currentLayout === 23){
+    $findPaticipant['participantName'] = $participantName;
+    $participantInfo = databaseQuery('participantInfo', $findPaticipant);
+
+    //Set variables for SQL queries in following actions
+    $participantTableId = $participantInfo['id'];
+
+    if ($layoutType === 'focus' || $layoutType === 'transferFocus') {
+        $customLayout = 33;
+    } else if ($layoutType === 'important') {
+        if ($currentLayout === 3 || $currentLayout === 23){
             $customLayout = 23;
         } else {
             $customLayout = 33;
         }
     }
-    
+
     if ($currentLayout === 3 || $currentLayout === 23){
-        //set pane order for assignment in special layout
+        //set pane order for assignment in special layout for 9 people
         $specialPaneIndex[2] = 2;
         $specialPaneIndex[3] = 3;
         $specialPaneIndex[4] = 4;
@@ -1117,7 +1172,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         $specialPaneIndex[8] = 8;
         $specialPaneIndex[9] = 9;
     } else {
-        //set pane order for assignment in special layout
+        //set pane order for assignment in special layout for layout 33
         $specialPaneIndex[2] = 2;
         $specialPaneIndex[3] = 13;
         $specialPaneIndex[4] = 12;
@@ -1127,7 +1182,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
         $specialPaneIndex[8] = 11;
         $specialPaneIndex[9] = 3;
     }
-	
+
 
     if ($currentLayout != $customLayout) {
         $data['action'] = 'save';
@@ -1135,21 +1190,28 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
 
         databaseQuery('conferenceSavedLayout', $data);
     }
-	
-	//set selected participant to important
-	$checkImportant = mcuCommand(
-		array('prefix' => 'participant.'),
-		'modify',
-		array('authenticationUser' => $mcuUsername,
-			  'authenticationPassword' => $mcuPassword,
-			  'conferenceName' => $conferenceName,
-			  'participantName' => $participantName,
-			  'participantProtocol' => $participantProtocol,
-			  'participantType' => $participantType,
-			  'operationScope' => 'activeState',
-			  'important' => true)
-	);
-	
+
+    //set selected participant to important
+    $checkImportant = mcuCommand(
+        array('prefix' => 'participant.'),
+        'modify',
+        array('authenticationUser' => $mcuUsername,
+              'authenticationPassword' => $mcuPassword,
+              'conferenceName' => $conferenceName,
+              'participantName' => $participantName,
+              'participantProtocol' => $participantProtocol,
+              'participantType' => $participantType,
+              'operationScope' => 'activeState',
+              'important' => true)
+    );
+    
+    //Make the participant important the database
+    $importantParticipant['action'] = "importantParticipant";
+    $importantParticipant['participantTableId'] = $participantTableId;
+    $importantParticipant['conferenceTableId'] = $conferenceTableId;
+    $importantParticipant['importantValue'] = true;
+    $importantParticipantResult = databaseQuery('participantUpdate', $importantParticipant);
+
     if ($currentLayout != $customLayout) {
         $query['name'] = 'showIsLive';
         $showIsLive = filter_var(databaseQuery('readIntSetting', $query), FILTER_VALIDATE_BOOLEAN);
@@ -1180,8 +1242,15 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                       'newParticipantsCustomLayout' => true)
             );
         }
+        
+        //Make the participant non-important the database
+        $changeLayout['action'] = "changeLayout";
+        $changeLayout['conferenceTableId'] = $conferenceTableId;
+        $changeLayout['layout'] = $customLayout;
+        $changeLayoutResult = databaseQuery('conferenceUpdate', $changeLayout);
+        
     }
-    
+
     //need 2 counter variables for assigning the proper panes to the proper special location
     $y = 1;
     $x = 2;
@@ -1190,65 +1259,63 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                                 'type' => 'blank');
         $y++;
     }
-    
+
     foreach ($scrubbedParticipantList as $part) {
 
-        if ($currentLayout != $customLayout) {
-            $data['action'] = 'save';
-            $data['pane'] = $part['pane'];
-            $data['participantName'] = $part['participantName'];
-            $data['displayName'] = $part['displayName'];
-            $data['conferenceName'] = $conferenceName;
-            
-            $setSavedPaneResult = databaseQuery('savedPane', $data);
-        }
-        
         //Get Participant info of the moving participant to update the Pane Placement database
-        $findPaticipant['displayName'] = addslashes($part['displayName']);
-        $findPaticipant['conferenceId'] = $conferenceTableId;
+        $findPaticipant['participantName'] = $part['participantName'];
         $participantInfo = databaseQuery('participantInfo', $findPaticipant);
 
         //Set variables for SQL queries in following actions
         $participantTableId = $participantInfo['id'];
-        
-        
+
         if ($part['participantName'] == $participantName) {
-            
+
             $paneDetail[1]  = array('index' => 1,
                                     'type' => 'participant',
                                     'participantName' => $part['participantName'],
                                     'participantProtocol' => $part['participantProtocol'],
                                     'participantType' => $part['participantType']);
-            
+
             $updatePane['action'] = "customLayoutPaneUpdate";
             $updatePane['pane'] = 1;
             $updatePane['conferenceTableId'] = $conferenceTableId;
             $updatePane['participantTableId'] = $participantTableId;
-            $updatePaneResult = databaseQuery('paneUpdate', $updatePane);
-            
+
         } else {
-            
-			$updatePane['action'] = "customLayoutPaneUpdate";
-			$updatePane['pane'] = 0;
-			$updatePane['conferenceTableId'] = $conferenceTableId;
-			$updatePane['participantTableId'] = $participantTableId;
-			
-			if ($layoutType === 'important') {
-				$paneDetail[$specialPaneIndex[$x]] = array('index' => $specialPaneIndex[$x],
+
+            $updatePane['action'] = "customLayoutPaneUpdate";
+            $updatePane['pane'] = 0;
+            $updatePane['conferenceTableId'] = $conferenceTableId;
+            $updatePane['participantTableId'] = $participantTableId;
+
+            if ($layoutType === 'important') {
+                $paneDetail[$specialPaneIndex[$x]] = array('index' => $specialPaneIndex[$x],
                                             'type' => 'participant',
                                             'participantName' => $part['participantName'],
                                             'participantProtocol' => $part['participantProtocol'],
                                             'participantType' => $part['participantType']);
 
                 $updatePane['pane'] = $specialPaneIndex[$x];
-			}
-			
-			$updatePaneResult = databaseQuery('paneUpdate', $updatePane);
+            }
+
             $x++;
         }
-        
+
+        $updatePaneResult = databaseQuery('panePlacementUpdate', $updatePane);
+
+        if ($currentLayout != $customLayout) {
+            $data['action'] = 'save';
+            $data['pane'] = $part['pane'];
+            $data['participantTableId'] = $participantTableId;
+            $data['conferenceTableId'] = $conferenceTableId;
+
+            $setSavedPaneResult = databaseQuery('savedPane', $data);
+
+        }
+
     }
-    
+
     $setCustomPanes = mcuCommand(
         array('prefix' => 'conference.paneplacement.'),
         'modify',
@@ -1280,254 +1347,277 @@ if (isset($_POST['action']) && $_POST['action'] == 'refresh') {
                         )
         )
     );
-    
+
     /*
     //For muting participants rather than lowering their volume
     foreach ($scrubbedParticipantList as $part) {
-        
-		if ($part['participantName'] == $participantName) {
-            
+
+        if ($part['participantName'] == $participantName) {
+
             $unmuteFocus = mcuCommand(
-				array('prefix' => 'participant.'),
-				'modify',
-				array('authenticationUser' => $mcuUsername,
-						'authenticationPassword' => $mcuPassword,
-						'conferenceName' => $conferenceName,
-						'participantName' => $part['participantName'],
-						'participantProtocol' => $part['participantProtocol'],
-						'participantType' => $part['participantType'],
-						'operationScope' => 'activeState',
-						'audioRxMuted' => false)
-			);
-			
-		} else {
-			
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                        'authenticationPassword' => $mcuPassword,
+                        'conferenceName' => $conferenceName,
+                        'participantName' => $part['participantName'],
+                        'participantProtocol' => $part['participantProtocol'],
+                        'participantType' => $part['participantType'],
+                        'operationScope' => 'activeState',
+                        'audioRxMuted' => false)
+            );
+
+        } else {
+
             $muteNonFocus = mcuCommand(
-				array('prefix' => 'participant.'),
-				'modify',
-				array('authenticationUser' => $mcuUsername,
-						'authenticationPassword' => $mcuPassword,
-						'conferenceName' => $conferenceName,
-						'participantName' => $part['participantName'],
-						'participantProtocol' => $part['participantProtocol'],
-						'participantType' => $part['participantType'],
-						'operationScope' => 'activeState',
-						'audioRxMuted' => true)
-			);
-		
-		}
-	}
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                        'authenticationPassword' => $mcuPassword,
+                        'conferenceName' => $conferenceName,
+                        'participantName' => $part['participantName'],
+                        'participantProtocol' => $part['participantProtocol'],
+                        'participantType' => $part['participantType'],
+                        'operationScope' => 'activeState',
+                        'audioRxMuted' => true)
+            );
+
+        }
+    }
     */
-    
+
     //For lowering participants volume rather than muting them
     foreach ($scrubbedParticipantList as $part) {
-        
-		if ($part['participantName'] == $participantName) {
-            
+
+        if ($part['participantName'] == $participantName) {
+
             $unmuteFocus = mcuCommand(
-				array('prefix' => 'participant.'),
-				'modify',
-				array('authenticationUser' => $mcuUsername,
-						'authenticationPassword' => $mcuPassword,
-						'conferenceName' => $conferenceName,
-						'participantName' => $part['participantName'],
-						'participantProtocol' => $part['participantProtocol'],
-						'participantType' => $part['participantType'],
-						'operationScope' => 'activeState',
-						'audioRxGainMode' => 'default')
-			);
-			
-		} else {
-			
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                        'authenticationPassword' => $mcuPassword,
+                        'conferenceName' => $conferenceName,
+                        'participantName' => $part['participantName'],
+                        'participantProtocol' => $part['participantProtocol'],
+                        'participantType' => $part['participantType'],
+                        'operationScope' => 'activeState',
+                        'audioRxGainMode' => 'default')
+            );
+
+        } else {
+
             $muteNonFocus = mcuCommand(
-				array('prefix' => 'participant.'),
-				'modify',
-				array('authenticationUser' => $mcuUsername,
-						'authenticationPassword' => $mcuPassword,
-						'conferenceName' => $conferenceName,
-						'participantName' => $part['participantName'],
-						'participantProtocol' => $part['participantProtocol'],
-						'participantType' => $part['participantType'],
-						'operationScope' => 'activeState',
-						'audioRxGainMode' => 'fixed',
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                        'authenticationPassword' => $mcuPassword,
+                        'conferenceName' => $conferenceName,
+                        'participantName' => $part['participantName'],
+                        'participantProtocol' => $part['participantProtocol'],
+                        'participantType' => $part['participantType'],
+                        'operationScope' => 'activeState',
+                        'audioRxGainMode' => 'fixed',
                         'audioRxGainMillidB' => -10000)
-			);
-		
-		}
-	}
-    
+            );
+
+        }
+    }
+
     echo json_encode(array('alert' => ''));
 
 } elseif (isset($_POST['action']) && $_POST['action'] == 'resetSpecialLayout') {
-    
-	$conferenceName = $_POST['conferenceName'];
-	$participantName = $_POST['participantName'];
-	$participantProtocol = $_POST['participantProtocol'];
-	$participantType = $_POST['participantType'];
-	$scrubbedParticipantList = $_POST['scrubbedParticipantList'];
-    	
-	$data['action'] = 'get';
-	$data['conferenceName'] = $conferenceName;
-	
-	$oldLayout = databaseQuery('conferenceSavedLayout', $data);
-    
+
+    $conferenceName = $_POST['conferenceName'];
+    $participantName = $_POST['participantName'];
+    $participantProtocol = $_POST['participantProtocol'];
+    $participantType = $_POST['participantType'];
+    $scrubbedParticipantList = $_POST['scrubbedParticipantList'];
+
+    $data['action'] = 'get';
+    $data['conferenceName'] = $conferenceName;
+
+    $oldLayout = databaseQuery('conferenceSavedLayout', $data);
+
     $conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
     $conferenceTableId = $conferenceInfo['id'];
-	
-	//set selected participant to important
-	$checkImportant = mcuCommand(
-		array('prefix' => 'participant.'),
-		'modify',
-		array('authenticationUser' => $mcuUsername,
-			  'authenticationPassword' => $mcuPassword,
-			  'conferenceName' => $conferenceName,
-			  'participantName' => $participantName,
-			  'participantProtocol' => $participantProtocol,
-			  'participantType' => $participantType,
-			  'operationScope' => 'activeState',
-			  'important' => false)
-	);
-	
-	$query['name'] = 'showIsLive';
+
+    //Get Participant info of the moving participant to update the Pane Placement database
+    $resetPaticipant['participantName'] = $participantName;
+    $resetPaticipantInfo = databaseQuery('participantInfo', $resetPaticipant);
+
+    //Set variables for SQL queries in following actions
+    $resetPaticipantTableId = $resetPaticipantInfo['id'];
+    
+    //set selected participant to important
+    $checkImportant = mcuCommand(
+        array('prefix' => 'participant.'),
+        'modify',
+        array('authenticationUser' => $mcuUsername,
+              'authenticationPassword' => $mcuPassword,
+              'conferenceName' => $conferenceName,
+              'participantName' => $participantName,
+              'participantProtocol' => $participantProtocol,
+              'participantType' => $participantType,
+              'operationScope' => 'activeState',
+              'important' => false)
+    );
+
+    //Make the participant non-important the database
+    $importantParticipant['action'] = "importantParticipant";
+    $importantParticipant['participantTableId'] = $resetPaticipantTableId;
+    $importantParticipant['conferenceTableId'] = $conferenceTableId;
+    $importantParticipant['importantValue'] = false;
+    $importantParticipantResult = databaseQuery('participantUpdate', $importantParticipant);
+    
+    
+    $query['name'] = 'showIsLive';
     $showIsLive = filter_var(databaseQuery('readIntSetting', $query), FILTER_VALIDATE_BOOLEAN);
 
-	if ($showIsLive == true) {
-	
-		$result = mcuCommand(
-			array('prefix' => 'conference.'),
-			'modify',
-			array('authenticationUser' => $mcuUsername,
-				  'authenticationPassword' => $mcuPassword,
-				  'conferenceName' => $conferenceName,
-				  'customLayoutEnabled' => true,
-				  'customLayout' => $oldLayout)
-		);
-	
-	} else {
-	
-		$result = mcuCommand(
-			array('prefix' => 'conference.'),
-			'modify',
-			array('authenticationUser' => $mcuUsername,
-				  'authenticationPassword' => $mcuPassword,
-				  'conferenceName' => $conferenceName,
-				  'customLayoutEnabled' => true,
-				  'customLayout' => $oldLayout,
-				  'setAllParticipantsToCustomLayout' => true,
-				  'newParticipantsCustomLayout' => true)
-		);
-	}
+    if ($showIsLive == true) {
+
+        $result = mcuCommand(
+            array('prefix' => 'conference.'),
+            'modify',
+            array('authenticationUser' => $mcuUsername,
+                  'authenticationPassword' => $mcuPassword,
+                  'conferenceName' => $conferenceName,
+                  'customLayoutEnabled' => true,
+                  'customLayout' => $oldLayout)
+        );
+
+    } else {
+
+        $result = mcuCommand(
+            array('prefix' => 'conference.'),
+            'modify',
+            array('authenticationUser' => $mcuUsername,
+                  'authenticationPassword' => $mcuPassword,
+                  'conferenceName' => $conferenceName,
+                  'customLayoutEnabled' => true,
+                  'customLayout' => $oldLayout,
+                  'setAllParticipantsToCustomLayout' => true,
+                  'newParticipantsCustomLayout' => true)
+        );
+    }
+    
+    //Make the participant non-important the database
+    $changeLayout['action'] = "changeLayout";
+    $changeLayout['conferenceTableId'] = $conferenceTableId;
+    $changeLayout['layout'] = $oldLayout;
+    $changeLayoutResult = databaseQuery('conferenceUpdate', $changeLayout);
 
     $y = 1;
     while ($y <= 20) {
         $paneDetail[$y] = array('index' => $y,
                                 'type' => 'default');
         $y++;
-    }    
-    
+    }
+
     $x = 1;
     foreach ($scrubbedParticipantList as $part) {
-        
+
+        //Get Participant info of the moving participant to update the Pane Placement database
+        $findPaticipant['participantName'] = $part['participantName'];
+        $participantInfo = databaseQuery('participantInfo', $findPaticipant);
+
+        //Set variables for SQL queries in following actions
+        $participantTableId = $participantInfo['id'];
+
         $data['action'] = 'get';
-        $data['participantName'] = $part['participantName'];
-        $data['displayName'] = $part['displayName'];
-        $data['conferenceName'] = $conferenceName;
-        
+        $data['participantTableId'] = $participantTableId;
+        $data['conferenceTableId'] = $conferenceTableId;
+
         $oldPane = databaseQuery('savedPane', $data);
-            
+
         $paneDetail[$x]  = array('index' => $oldPane,
                              'type' => 'participant',
                              'participantName' => $part['participantName'],
                              'participantProtocol' => $part['participantProtocol'],
                              'participantType' => $part['participantType']);
-        
-        $x++;
-        
-        //Get Participant info of the moving participant to update the Pane Placement database
-        $findPaticipant['displayName'] = addslashes($part['displayName']);
-        $findPaticipant['conferenceId'] = $conferenceTableId;
-        $participantInfo = databaseQuery('participantInfo', $findPaticipant);
 
-        //Set variables for SQL queries in following actions
-        $participantTableId = $participantInfo['id'];
-                
-        $updatePane['action'] = "customLayoutPaneUpdate";
-        $updatePane['pane'] = $oldPane;
-        $updatePane['conferenceTableId'] = $conferenceTableId;
-        $updatePane['participantTableId'] = $participantTableId;
-        $updatePaneResult = databaseQuery('paneUpdate', $updatePane);
+        $x++;
+
+
+
+        $customLayoutPaneUpdate['action'] = "customLayoutPaneUpdate";
+        $customLayoutPaneUpdate['pane'] = $oldPane;
+        $customLayoutPaneUpdate['conferenceTableId'] = $conferenceTableId;
+        $customLayoutPaneUpdate['participantTableId'] = $participantTableId;
+        $customLayoutPaneUpdateResult = databaseQuery('panePlacementUpdate', $customLayoutPaneUpdate);
+
+
     }
-	
-	$setPaneBlank = mcuCommand(
-		array('prefix' => 'conference.paneplacement.'),
-		'modify',
-			array('authenticationUser' => $mcuUsername,
-				'authenticationPassword' => $mcuPassword,
-				'conferenceName' => $conferenceName,
-				'enabled' => true,
-				'panes' =>
-					array($paneDetail[1],
+
+    $addPaneEntryBlank = mcuCommand(
+        array('prefix' => 'conference.paneplacement.'),
+        'modify',
+            array('authenticationUser' => $mcuUsername,
+                'authenticationPassword' => $mcuPassword,
+                'conferenceName' => $conferenceName,
+                'enabled' => true,
+                'panes' =>
+                    array($paneDetail[1],
                         $paneDetail[2],
                         $paneDetail[3],
                         $paneDetail[4],
-						$paneDetail[5],
-						$paneDetail[6],
-						$paneDetail[7],
-						$paneDetail[8],
-						$paneDetail[9],
-						$paneDetail[10],
-						$paneDetail[11],
-						$paneDetail[12],
-						$paneDetail[13],
+                        $paneDetail[5],
+                        $paneDetail[6],
+                        $paneDetail[7],
+                        $paneDetail[8],
+                        $paneDetail[9],
+                        $paneDetail[10],
+                        $paneDetail[11],
+                        $paneDetail[12],
+                        $paneDetail[13],
                         $paneDetail[14],
-						$paneDetail[15],
-						$paneDetail[16],
-						$paneDetail[17],
-						$paneDetail[18],
-						$paneDetail[19],
-						$paneDetail[20]
-						)
-			)
-	);
-	
+                        $paneDetail[15],
+                        $paneDetail[16],
+                        $paneDetail[17],
+                        $paneDetail[18],
+                        $paneDetail[19],
+                        $paneDetail[20]
+                        )
+            )
+    );
+
     /*
     //For Muting and unmuting
     foreach ($scrubbedParticipantList as $part) {
 
         $unmuteAll = mcuCommand(
-				array('prefix' => 'participant.'),
-				'modify',
-				array('authenticationUser' => $mcuUsername,
-						'authenticationPassword' => $mcuPassword,
-						'conferenceName' => $conferenceName,
-						'participantName' => $part['participantName'],
-						'participantProtocol' => $part['participantProtocol'],
-						'participantType' => $part['participantType'],
-						'operationScope' => 'activeState',
-						'audioRxMuted' => false)
-		);
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                        'authenticationPassword' => $mcuPassword,
+                        'conferenceName' => $conferenceName,
+                        'participantName' => $part['participantName'],
+                        'participantProtocol' => $part['participantProtocol'],
+                        'participantType' => $part['participantType'],
+                        'operationScope' => 'activeState',
+                        'audioRxMuted' => false)
+        );
 
     }
     */
-    
+
     //For returning volume to normal
     foreach ($scrubbedParticipantList as $part) {
 
         $unmuteAll = mcuCommand(
-				array('prefix' => 'participant.'),
-				'modify',
-				array('authenticationUser' => $mcuUsername,
-						'authenticationPassword' => $mcuPassword,
-						'conferenceName' => $conferenceName,
-						'participantName' => $part['participantName'],
-						'participantProtocol' => $part['participantProtocol'],
-						'participantType' => $part['participantType'],
-						'operationScope' => 'activeState',
-						'audioRxGainMode' => 'default')
-		);
+                array('prefix' => 'participant.'),
+                'modify',
+                array('authenticationUser' => $mcuUsername,
+                        'authenticationPassword' => $mcuPassword,
+                        'conferenceName' => $conferenceName,
+                        'participantName' => $part['participantName'],
+                        'participantProtocol' => $part['participantProtocol'],
+                        'participantType' => $part['participantType'],
+                        'operationScope' => 'activeState',
+                        'audioRxGainMode' => 'default')
+        );
 
     }
-    
+
     echo json_encode(array('alert' => '' ));
 
 }

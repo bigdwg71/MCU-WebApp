@@ -1,15 +1,9 @@
 <?php
-//Chris Settings
+//Kimmel Settings
 $db_hostname = 'localhost';
 $db_username = 'root';
-$db_password = 'C1sc0123';
-$db_database = 'mcuDB5';
-
-//Peter Settings
-//$db_hostname = 'localhost';
-//$db_username = 'root';
-//$db_password = 'root';
-//$db_database = 'kimmel99';
+$db_password = 'j1mmyk1mm3l';
+$db_database = 'mcuDB7';
 
 //read all settings from the setting table
 $allSettings = databaseQuery('readAllSettings', 'blah');
@@ -23,3 +17,4 @@ $domainName = $allSettings['settings']['domainName']['value'];
 $loopURI = $allSettings['settings']['loopDN']['value'] . '@' . $domainName;
 //$wallConference = $allSettings['settings']['wallConference']['value'];
 $waitingRoom = $allSettings['settings']['waitingRoom']['value'];
+$sortField = $allSettings['settings']['sortField']['value'];

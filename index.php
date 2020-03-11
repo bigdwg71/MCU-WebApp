@@ -21,9 +21,11 @@
         <meta name="theme-color" content="#ffffff">
         <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
         <meta http-equiv="x-ua-compatible" content="IE=8" />
-        <script type="text/javascript" src="scripts/jquery-1.11.2.min.js?v=0.7"></script>
-        <script type="text/javascript" src="scripts/refresher.js?v=0.7"></script>
-        <!--<link rel="stylesheet" type="text/css" href="css/base.css" />-->
+        <!--<script type="text/javascript" src="scripts/jquery-1.11.2.min.js"></script>/>-->
+        <script type="text/javascript" src="scripts/jquery-3.2.1.min.js"></script>
+        <script type="text/javascript" src="scripts/refresher.js"></script>
+        <link rel="stylesheet" type="text/css" href="css/collab-ui.css" />
+        <link rel="stylesheet" type="text/css" href="css/base.css" />
     </head>
     <body>
         <div id="participantList"></div>
