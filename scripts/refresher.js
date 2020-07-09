@@ -9,6 +9,10 @@ var refreshWebTimer;
 var writeConferenceTimer;
 var writeParticipantTimer;
 var writePanesDBTimer;
+var hostID = "";
+var guest1ID = "";
+var guest2ID = "";
+var recorderPrefix = "";
 
 //Create variables that we need to survive automatic refreshes and button clicks
 var refreshWebInterval, writeConferenceInterval, writeParticipantInterval, writePanesDBInterval;
@@ -21,6 +25,12 @@ var conferenceImportant = false;
 var checkContent = [];
 var openModalId = "";
 checkContent[0] = "";
+var callField = [];
+var pauseRefresh = false;
+var keyPressTimeout;
+var hostPane = [[], []];
+var guestPane = [[], []];
+var guest2Pane = [[], []];
 
 function layoutsDialog(dialogId) {
     "use strict";
@@ -37,6 +47,9 @@ function refreshWeb(refreshType) {
         if (r.conferenceArray && r.participantArray) {
             participantList = r.participantArray;
             conferenceList = r.conferenceArray;
+			hostPane.length = 0;
+			guestPane.length = 0;
+			guest2Pane.length = 0;
             var deviceQuery = r.deviceQuery, content = [], currentConference, column = 1, portsUsed = participantList.length, portsTotal = deviceQuery.videoPortAllocation[0]['count'], portsAvailable = portsTotal - portsUsed, portType = '', portAlert = '';
 
             //set the show is live variable to see if the show is in pre-show mode or in filming mode
@@ -318,8 +331,7 @@ function refreshWeb(refreshType) {
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="4" value="4x4"' + isDisabled4 + '><img src="css/images/layout4x4.png" alt="4x4"/></button></li>';
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4"/></button></li>';
                 content[0] += '</ul>';
-                content[0] += '<form id="panePlacement">';
-
+                content[0] += '<form id="panePlacement' + conferenceArrayInnerValue.uniqueId + '">';
 
                 //post this information to refresher.php to take action
 
@@ -483,10 +495,29 @@ function refreshWeb(refreshType) {
                 content[0] += '<td class="confTitle" colspan="' + (conferenceTotal+3) + '"><span>' + currentConference + '</span>';
 				
 				titlePosition = content[0].length;
-                
-				content[0] += '<form onsubmit="return false" class="dialOutForm" id="dialOut' + conferenceArrayInnerValue.uniqueId + '">';
-                content[0] += '<input class="dialOutInput" id="call' + conferenceArrayInnerValue.uniqueId + '" type="text" name="call">';
+                //content[0] += '<form onsubmit="return false" class="viewerToggleForm" id="viewerToggle' + conferenceArrayInnerValue.uniqueId + '">';
+				/*
+				var viewerConferenceID = false;
+				
+				if (viewerConferenceID == true) {
+					content[0] += '<input class="viewerConference btn btn--negative" data-confid="' + conferenceArrayInnerValue.uniqueId + '" data-conf="' + currentConference + '" type="button" value="Viewer">';
+				} else { 
+					content[0] += '<input class="viewerConference btn btn--white" data-confid="' + conferenceArrayInnerValue.uniqueId + '" data-conf="' + currentConference + '" type="button" value="Viewer">';
+				}
+				*/
+				
+				//content[0] += '</form>';
+                //titlePosition = content[0].length;
+                content[0] += '<form onsubmit="return false" class="dialOutForm" id="dialOut' + conferenceArrayInnerValue.uniqueId + '">';
+				if (callField[conferenceName] == null) {
+					content[0] += '<input class="dialOutInput" id="call' + conferenceArrayInnerValue.uniqueId + '" type="text" name="call">';
+				} else {
+					content[0] += '<input class="dialOutInput" id="call' + conferenceArrayInnerValue.uniqueId + '" type="text" name="call" value="' + callField[currentConference] + '">';
+				}
                 content[0] += '<input class="dialOut btn btn--white" data-confid="' + conferenceArrayInnerValue.uniqueId + '" data-conf="' + currentConference + '" type="button" value="Call">';
+				//call a recorder
+				content[0] += '<input class="addRecorder btn btn--negative" data-confid="' + conferenceArrayInnerValue.uniqueId + '" data-conf="' + currentConference + '" type="button" value="Add Recorder">';
+				
                 content[0] += '</form>';
                 content[0] += '</td>';
                 content[0] += '</tr>';
@@ -502,6 +533,8 @@ function refreshWeb(refreshType) {
                             content[0] += '<tr class="loop">';
                         } else if (participantArrayInnerValue.displayName === "__") {
                             content[0] += '<tr class="codec">';
+                        } else if (participantArrayInnerValue.displayName.startsWith(recorderPrefix)) {
+                            content[0] += '<tr class="recorder">';
                         } else {
                             participantCounter = participantCounter + 1;
 
@@ -524,62 +557,45 @@ function refreshWeb(refreshType) {
 
                             } else if (participantArraySubI === 'pane') {
                                 content[0] += '<td class="paneNumber">' + participantArraySubObject + '</td>';
-                            } else if (participantArraySubI === 'participantPreview') {
-
-                                //This section ensures that we only update the preview URL if we have passed the refreshPreview timeout
-                                /*
-                                currentTime = new Date().getTime();
-
-                                if (currentTime >= (lastRefresh + refreshPreview)) {
-                                    lastRefresh = currentTime;
-                                    time = lastRefresh;
-                                } else {
-                                    time = lastRefresh;
-                                }
-                                */
-
-                                //This code adds previews to the page. Right now it is disabled until we can figure out how to download the images to the web server then host from here. Otherwise, load/latency is too high on MCU. DO NOT DELETE
-                                //content[0] += '<td class="'+participantArraySubI+' hide"> <div class="preview"><img class="fullsize" src="'+participantArraySubObject+'?'+time+'" alt="Preview"><img class="thumb" width="40" height="22" src="'+participantArraySubObject+'?'+time+'" alt="Preview"> </div></td>';
-
-                                //content[0] += '<td class="mobilehide1">' + participantCounter + '</td>';
-
-                                //Set Pane for participant
-                                //content[0] += '<td class="mobilehide">'+participantCounter+'</td>';
-
                             } else if (participantArraySubI === 'audioRxMuted') {
+								//Start TD for Icons
+								content[0] += '<td class="muteimages"><div class="mutebuttons">';
+								
+								if (!participantArrayInnerValue.displayName.startsWith(recorderPrefix)) {								
+								//Important status
+									if (participantArrayInnerValue.important === false || participantArrayInnerValue.important === '0') {
+										 content[0] += '<span class="importantCommand icon icon-star icon-2x" value="markImportant" data-conf="' + currentConference + '"></span>';
+									} else {
+										content[0] += '<span class="importantCommand importantTrue icon icon-star icon-2x" value="unmarkImportant" data-conf="' + currentConference + '"></span>';
+									}
+								}
 
                                 //Set mute images appropriately based on the response from the API. This should a participants current audio and video mute status
                                 if (participantArraySubObject === false || participantArraySubObject === '0') {
-                                    //content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/audioRX-unmuted.png" height="24" width="24" value="Mute" action="audioRXmute" data-conf="' + currentConference + '">';
-                                    content[0] += '<td class="muteimages"><div class="mutebuttons"><span class="muteCommand icon icon-microphone icon-2x" value="Mute" action="audioRXmute" data-conf="' + currentConference + '"></span>';
+                                    content[0] += '<span class="muteCommand icon icon-microphone icon-2x" value="Mute" action="audioRXmute" data-conf="' + currentConference + '"></span>';
                                 } else {
-                                    //content[0] += '<td class="muteimages"><div class="mutebuttons"><img class="muteCommand" src="./css/images/audioRX-muted.png"  height="24" width="24" value="Unmute" action="audioRXunmute" data-conf="' + currentConference + '">';
-                                    content[0] += '<td class="muteimages"><div class="mutebuttons"><span class="muteCommand icon icon-mute icon-2x" value="Unmute" action="audioRXunmute" data-conf="' + currentConference + '"></span>';
+                                    content[0] += '<span class="muteCommand icon icon-mute icon-2x" value="Unmute" action="audioRXunmute" data-conf="' + currentConference + '"></span>';
                                 }
 
                                 if (participantArrayInnerValue.audioTxMuted === false || participantArrayInnerValue.audioTxMuted === '0') {
-                                    //content[0] += '<img class="muteCommand" src="./css/images/audioTX-unmuted.png" height="24" width="24" value="Mute" action="audioTXmute" data-conf="' + currentConference + '">';
                                      content[0] += '<span class="muteCommand icon icon-audio icon-2x" value="Mute" action="audioTXmute" data-conf="' + currentConference + '"></span>';
                                 } else {
-                                    //content[0] += '<img class="muteCommand" src="./css/images/audioTX-muted.png" height="24" width="24" value="Unmute" action="audioTXunmute" data-conf="' + currentConference + '">';
                                     content[0] += '<span class="muteCommand icon icon-volume-cross icon-2x" value="Unmute" action="audioTXunmute" data-conf="' + currentConference + '"></span>';
                                 }
 
                                 if (participantArrayInnerValue.videoRxMuted === false || participantArrayInnerValue.videoRxMuted === '0') {
-                                    //content[0] += '<img class="muteCommand" src="./css/images/videoRX-unmuted.png" height="24" width="24" value="Mute" action="videoRXmute" data-conf="' + currentConference + '">';
                                     content[0] += '<span class="muteCommand icon icon-video icon-2x" value="Mute" action="videoRXmute" data-conf="' + currentConference + '"></span>';
                                 } else {
-                                    //content[0] += '<img class="muteCommand" src="./css/images/videoRX-muted.png" height="24" width="24" value="Unmute" action="videoRXunmute" data-conf="' + currentConference + '">';
                                     content[0] += '<span class="muteCommand icon icon-video-cross icon-2x" value="Unmute" action="videoRXunmute" data-conf="' + currentConference + '"></span>';
                                 }
 
                                 if (participantArrayInnerValue.videoTxMuted === false || participantArrayInnerValue.videoTxMuted === '0') {
-                                    //content[0] += '<img class="muteCommand" src="./css/images/videoTX-unmuted.png" height="24" width="24" value="Mute" action="videoTXmute" data-conf="' + currentConference + '"></div><div class="clearfloat"></div></td>';
-                                    content[0] += '<span class="muteCommand icon icon-view-preview-telepresence icon-2x" value="Mute" action="videoTXmute" data-conf="' + currentConference + '"></span></div><div class="clearfloat"></div></td>';
+                                    content[0] += '<span class="muteCommand icon icon-view-preview-telepresence icon-2x" value="Mute" action="videoTXmute" data-conf="' + currentConference + '"></span>';
                                 } else {
-                                    //content[0] += '<img class="muteCommand" src="./css/images/videoTX-muted.png" height="24" width="24" value="Unmute" action="videoTXunmute" data-conf="' + currentConference + '"></div><div class="clearfloat"></div></td>';
-                                    content[0] += '<span class="muteCommand icon icon-view-preview-telepresence icon-view-preview-telepresence-muted icon-2x" value="Unmute" action="videoTXunmute" data-conf="' + currentConference + '"></span></div><div class="clearfloat"></div></td>';
+                                    content[0] += '<span class="muteCommand icon icon-view-preview-telepresence icon-view-preview-telepresence-muted icon-2x" value="Unmute" action="videoTXunmute" data-conf="' + currentConference + '"></span>';
                                 }
+								
+								content[0] += '</div><div class="clearfloat"></div></td>';
 
                             } else if (participantArraySubI === 'displayName') {
                                 //Check for special character names for Loops and Codecs to treat them properly
@@ -589,7 +605,28 @@ function refreshWeb(refreshType) {
                                     participantNameOveride = 'Loop';
                                 } else if (participantArraySubObject === "__") {
                                     participantNameOveride = 'Codec';
-                                } else {
+                                } else if (participantArraySubObject.startsWith(recorderPrefix)) {
+                                    participantNameOveride = 'Recorder (' + participantArraySubObject + ')';
+                                } else if (participantArraySubObject.startsWith(hostID)) {
+									//Match specific caller ID to know if its the Host
+                                    participantNameOveride = 'Host (' + participantArraySubObject + ')';
+									hostPane[conferenceArrayInnerValue.uniqueId] = [];
+									hostPane[conferenceArrayInnerValue.uniqueId]["participantName"] = participantArrayInnerValue.participantName;
+									hostPane[conferenceArrayInnerValue.uniqueId]["participantProtocol"] = participantArrayInnerValue.participantProtocol;
+									hostPane[conferenceArrayInnerValue.uniqueId]["participantType"] = participantArrayInnerValue.participantType;
+                                } else if (participantArraySubObject.startsWith(guest1ID)) {
+									participantNameOveride = 'Special Guest 1 (' + participantArraySubObject + ')';
+									guest2Pane[conferenceArrayInnerValue.uniqueId] = [];
+									guest2Pane[conferenceArrayInnerValue.uniqueId]["participantName"] = participantArrayInnerValue.participantName;
+									guest2Pane[conferenceArrayInnerValue.uniqueId]["participantProtocol"] = participantArrayInnerValue.participantProtocol;
+									guest2Pane[conferenceArrayInnerValue.uniqueId]["participantType"] = participantArrayInnerValue.participantType;
+                                } else if (participantArraySubObject.startsWith(guest2ID)) {
+									participantNameOveride = 'Special Guest 2 (' + participantArraySubObject + ')';
+									guestPane[conferenceArrayInnerValue.uniqueId] = [];
+									guestPane[conferenceArrayInnerValue.uniqueId]["participantName"] = participantArrayInnerValue.participantName;
+									guestPane[conferenceArrayInnerValue.uniqueId]["participantProtocol"] = participantArrayInnerValue.participantProtocol;
+									guestPane[conferenceArrayInnerValue.uniqueId]["participantType"] = participantArrayInnerValue.participantType;
+								} else {
                                     //For non-codec and non-loop participants
                                     //Is the current participant important?
 
@@ -600,22 +637,46 @@ function refreshWeb(refreshType) {
                                     }
                                 }
 
-
                                 //If the current layout is NOT 1 (single participant), then offer the focus button to make a user important
                                 if (participantNameOveride != 'Loop' && participantNameOveride != 'Codec' && currentConference != waitingRoom) {
-                                    if (layoutID + 1 === 2 || layoutID + 1 === 3 || layoutID + 1 === 8 || layoutID + 1 === 16) {
-                                        content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="setImportantParticipant btn btn--primary" type="button" value="Special Grid"/><input class="setFocusParticipant btn btn--primary" type="button" value="Single Pane"/></td>';
+                                    if (layoutID + 1 === 2 || layoutID + 1 === 3 || layoutID + 1 === 8) {
+										content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="setImportantParticipant btn btn--primary" type="button" value="Special Grid"/><input class="setFocusParticipant btn btn--primary" type="button" value="Single Pane"/></td>';
                                     } else if (layoutID + 1 === 33 || layoutID + 1 === 23) {
                                         if (participantMarked === "reset") {
                                             content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="' + participantMarked + 'specialLayout btn btn--meetings" type="button" value="Reset View"/></td>';
                                         } else {
                                             content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="' + participantMarked + 'specialLayout btn btn--primary" type="button" value="Switch Focus"/></td>';
                                         }
+									} else if ((layoutID + 1 === 1 || layoutID + 1 === 16) && participantArrayInnerValue.displayName.startsWith(recorderPrefix)) {
+										//If this is a recorder, then offer the view options
+										content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '" data-confid="' + conferenceArrayInnerValue.uniqueId + '">' + participantNameOveride + '</td>';
+										content[0] += '<td>';
+										//Add buttons
+										if (hostPane[conferenceArrayInnerValue.uniqueId] && guestPane[conferenceArrayInnerValue.uniqueId] && guest2Pane[conferenceArrayInnerValue.uniqueId]) {
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="split" value="Split"/>';
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="triple" value="Triple"/>';
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="host" value="Host"/>';
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="guest" value="Guest"/>';
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="default" value="Default"/>';
+										} else if (hostPane[conferenceArrayInnerValue.uniqueId] && guestPane[conferenceArrayInnerValue.uniqueId]) {
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="split" value="Split"/>';
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="host" value="Host"/>';
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="guest" value="Guest"/>';
+											content[0] += '<input class="setRecordView btn btn--primary" type="button" data-action="default" value="Default"/>';
+										}
+										content[0] += '</td>';
+                                    } else if (layoutID + 1 === 1 || layoutID + 1 === 16) {
+										//If single pane layout confernece, no need to offer single pane button
+										content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td></td>';
                                     } else {
                                         content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td><input class="setFocusParticipant btn btn--primary" style="width: 250px" type="button" value="Single Pane"/></td>';
                                     }
                                 } else {
-                                    content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td></td>';
+									if (guestPane[conferenceArrayInnerValue.uniqueId] && guest2Pane[conferenceArrayInnerValue.uniqueId] && layoutID + 1 === 1 && participantNameOveride === 'Codec') {
+										content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '" data-confid="' + conferenceArrayInnerValue.uniqueId + '">' + participantNameOveride + '</td><td><input class="setTwoGuest btn btn--primary" type="button" value="Two Guest"/></td>';
+									} else {
+										content[0] += '<td class="' + participantArraySubI + '" data-participantname="' + participantArrayInnerValue.participantName + '" data-panenumber="' + participantArrayInnerValue.pane + '" data-displayName="' + participantArrayInnerValue.displayName + '" data-participantprotocol="' + participantArrayInnerValue.participantProtocol + '" data-participanttype="' + participantArrayInnerValue.participantType + '" data-conferencename="' + participantArrayInnerValue.conferenceName + '">' + participantNameOveride + '</td><td></td>';
+									}
                                 }
                             }
                         });
@@ -627,20 +688,20 @@ function refreshWeb(refreshType) {
                                         content[0] += '<td class="loopConference"></td>';
                                     } else if (participantArrayInnerValue.displayName === "__") {
                                         content[0] += '<td class="loopConference"></td>';
+                                    } else if (participantArrayInnerValue.displayName === "Recorder") {
+                                        content[0] += '<td class="loopConference"></td>';
                                     } else if (conferenceImportant === true) {
                                         content[0] += '<td class="participant"><input class="btn disabled" type="button" value="' + conferenceArraySubObject + '"/></td>';
                                     } else {
                                         content[0] += '<td class="participant"><input class="btn transfer' + conferenceArraySubI + '" type="button" value="' + conferenceArraySubObject + '"/></td>';
                                     }
                                 } else if (conferenceArraySubObject === currentConference && conferenceArraySubI === "conferenceName") {
-                                    //content[0] += '<td class="currentConference">' + conferenceArraySubObject + '</td>';
                                     content[0] += '<td class="participant"><input class="btn disabled" type="button" value="' + conferenceArraySubObject + '"/></td>';
                                 }
                             });
                         });
 
                         //Creates a drop button for each participant including Loops and Codecs
-                        //content[0] += '<td class="dropCell"><input class="drop btn btn--negative" type="button" value="DROP"/></td>';
                         content[0] += '<td class="dropCell"><span class="drop icon icon-exit-contain icon-2x"></span></td>';
                         content[0] += '</tr>';
 
@@ -656,23 +717,23 @@ function refreshWeb(refreshType) {
                     content[0] += '<td class="muteimages">';
                     content[0] += '<div class="mutebuttons muteAllParticipants">';
                     content[0] += '<span class="muteAllCommand icon icon-microphone icon-2x" value="Mute" action="audioRXunmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioRX-unmuted.png" height="24" width="24" value="Unmute" action="audioRXunmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '<span class="muteAllCommand icon icon-audio icon-2x" value="Mute" action="audioTXunmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioTX-unmuted.png" height="24" width="24" value="Unmute" action="audioTXunmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '<span class="muteAllCommand icon icon-video icon-2x" value="Mute" action="videoRXunmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoRX-unmuted.png" height="24" width="24" value="Unmute" action="videoRXunmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '<span class="muteAllCommand icon icon-view-preview-telepresence icon-2x" value="Mute" action="videoTXunmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoTX-unmuted.png" height="24" width="24" value="Unmute" action="videoTXunmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '</div><div class="clearfloat"></div>';
                     content[0] += '<div class="mutebuttons">';
                     content[0] += '<span class="muteAllCommand icon icon-mute icon-2x" value="Unmute" action="audioRXmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioRX-muted.png"  height="24" width="24"value="Mute" action="audioRXmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '<span class="muteAllCommand icon icon-volume-cross icon-2x" value="Unmute" action="audioTXmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/audioTX-muted.png" height="24" width="24" value="Mute" action="audioTXmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '<span class="muteAllCommand icon icon-video-cross icon-2x" value="Unmute" action="videoRXmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoRX-muted.png" height="24" width="24" value="Mute" action="videoRXmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '<span class="muteAllCommand icon icon-view-preview-telepresence icon-view-preview-telepresence-muted icon-2x" value="Unmute" action="videoTXmuteAll" data-conf="' + currentConference + '"></span>';
-                    //content[0] += '<img class="muteAllCommand" src="./css/images/videoTX-muted.png" height="24" width="24" value="Mute" action="videoTXmuteAll" data-conf="' + currentConference + '">';
+
                     content[0] += '</div><div class="clearfloat"></div></td>';
                     content[0] += '</td>';
                     //For each conference, create a Transfer ALL buttons
@@ -716,16 +777,18 @@ function refreshWeb(refreshType) {
 
             //See if anything has changed. If not, don't update. If there is a change, update.
             if (checkContent[0] == '' || checkContent[0] !== content[0]) {
-                $('#mainSlice').empty();
-                //Push the content variable which contains all the HTML to the mainslice
-                $('#mainSlice').append(content[0]);
-                refreshState[0] = 'I did refresh';
-                refreshState[1] = checkContent[0];
-                refreshState[2] = content[0];
-                if (openModalId !== "") {
-                    layoutsDialog(openModalId);
-                }
-                checkContent[0] = content[0];
+				if (pauseRefresh == false) {
+					$('#mainSlice').empty();
+					//Push the content variable which contains all the HTML to the mainslice
+					$('#mainSlice').append(content[0]);
+					refreshState[0] = 'I did refresh';
+					refreshState[1] = checkContent[0];
+					refreshState[2] = content[0];
+					if (openModalId !== "") {
+						layoutsDialog(openModalId);
+					}
+					checkContent[0] = content[0];
+				}
             }
             //console.log(refreshState);
         }
@@ -886,14 +949,20 @@ $(document).ready(function () {
                 writeConferenceTimer = r.settings.timerConferencesDB.value;
                 writeParticipantTimer = r.settings.timerParticipantsDB.value;
                 writePanesDBTimer = r.settings.timerPanePlacementDB.value;
-                //console.log("I set settings");
-
+				//Get host and guest
+				hostID = r.settings.hostID.value;
+				guest1ID = r.settings.guest1ID.value;
+				guest2ID = r.settings.guest2ID.value;
+				recorderPrefix = r.settings.recorderPrefix.value;
+				
                 refreshWeb('first');
 
                 //Set the interval for how often we want the page to refresh
-                refreshWebInterval = setInterval(function () {
-                    refreshWeb('refresh');
-                }, refreshWebTimer);
+				//if (pauseRefresh == false) {
+					refreshWebInterval = setInterval(function () {
+						refreshWeb('refresh');
+					}, refreshWebTimer);
+				//}
 
                 writeConferenceInterval = setInterval(writeConferenceEnumerate, writeConferenceTimer);
                 writeParticipantInterval = setInterval(writeParticipantEnumerate, writeParticipantTimer);
@@ -1014,7 +1083,7 @@ $(document).ready(function () {
     $(document).on('mousedown', '.drop', function () {
         //find the closest td with the info we need for a move and store in a var
         var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).closest("tr").find(".displayName").data("conferencename");
-
+		
         //post this information to refresher.php to take action
         $.ajax({
             type: "POST",
@@ -1145,49 +1214,193 @@ $(document).ready(function () {
 
     //Initiate dial out
     $(document).on('mousedown', '.dialOut', function () {
-
+		pauseRefresh = false;
         var conferenceName = $(this).data("conf"), confId = $(this).data("confid"), callNumber = $('#call' + confId).val();
+		
+		if (callNumber !== "") {
+		
+			callField = "";
+		
+			//post this information to refresher.php to take action
+			$.ajax({
+				type: "POST",
+				url: "refresher.php",
+				data: {action: "call", conferenceName: conferenceName, callNumber: callNumber},
+				dataType: "json",
+				cache: false,
 
-        //post this information to refresher.php to take action
-        $.ajax({
-            type: "POST",
-            url: "refresher.php",
-            data: {action: "call", conferenceName: conferenceName, callNumber: callNumber},
-            dataType: "json",
-            cache: false,
-
-            success: function (r) {
-                if (r.alert) {
-                    console.log(r.alert);
-                    //console.log(callNumber);
-                }
-            }
-        });
-
-        //}
-
+				success: function (r) {
+					if (r.alert) {
+						console.log(r.alert);
+						//console.log(callNumber);
+					}
+				}
+			});
+		}
     });
 
-    $(document).on("keypress", '.dialOutInput', function (e) {
-            /* ENTER PRESSED*/
-        if (e.keyCode === 13) {
+	$(document).on("focus click", '.dialOutInput', function (e) {
+		pauseRefresh = true;
+		
+		if (keyPressTimeout) {
+			clearTimeout(keyPressTimeout);
+		}
+		
+		keyPressTimeout = setTimeout(function(){
+			pauseRefresh = false;
+		}, 2000);
+	});
 
-            var conferenceName = $(this).parent().find(".dialOut").data("conf"), confId = $(this).parent().find(".dialOut").data("confid"), callNumber = $(this).val();
-            //post this information to refresher.php to take action
+    $(document).on("keyup", '.dialOutInput', function (e) {
+        /* ENTER PRESSED*/
+        pauseRefresh = true;
+
+		if (keyPressTimeout) {
+			clearTimeout(keyPressTimeout);
+		}
+		
+		keyPressTimeout = setTimeout(function(){
+			pauseRefresh = false;
+		}, 2000);
+		
+		var callNumber = $(this).val(), conferenceName = $(this).parent().find(".dialOut").data("conf");
+		
+		if (e.keyCode === 13) {
+			if (callNumber !== "") {
+				var confId = $(this).parent().find(".dialOut").data("confid");
+				//reset call field value
+				callField[conferenceName] = "";
+				
+				//post this information to refresher.php to take action
+				$.ajax({
+					type: "POST",
+					url: "refresher.php",
+					data: {action: "call", conferenceName: conferenceName, callNumber: callNumber},
+					dataType: "json",
+					cache: false,
+
+					success: function (r) {
+						if (r.alert) {
+							console.log(r.alert);
+						}
+					}
+				});
+			}
+        } else if (e.keyCode == 8 || e.keyCode == 109 || e.keyCode == 110 || (e.keyCode >= 46 || e.keyCode <= 90) || (e.keyCode >= 96 || e.keyCode <= 105)) {
+			callField[conferenceName] = callNumber;
+			//alert(callNumber);
+		}
+    });
+	
+	$(document).on('mousedown', '.addRecorder', function () {
+		pauseRefresh = false;
+        var conferenceName = $(this).data("conf"), confId = $(this).data("confid"), callNumber = $('#call' + confId).val();
+		
+		if (callNumber !== "") {
+			callField = "";
+
+			//post this information to refresher.php to take action
+			$.ajax({
+				type: "POST",
+				url: "refresher.php",
+				data: {action: "addRecorder", conferenceName: conferenceName, callNumber: callNumber, recorderPrefix: recorderPrefix},
+				dataType: "json",
+				cache: false,
+
+				success: function (r) {
+					if (r.alert) {
+						console.log(r.alert);
+					}
+				}
+			});
+		}
+    });
+	
+    //Set the recorder view to split view with Host as important
+    $(document).on('mousedown', '.setRecordView', function () {
+        var conferenceName = $(this).closest("tr").find(".displayName").data("conferencename"),confID = $(this).closest("tr").find(".displayName").data("confid"), recorderName = $(this).closest("tr").find(".displayName").data("participantname"), recorderType = $(this).closest("tr").find(".displayName").data("participanttype"), recorderProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), view = $(this).data("action");
+		
+		if (!guest2Pane[confID]) {
+			guest2Pane[confID] = [];
+			guest2Pane[confID]["participantName"] = "";
+			guest2Pane[confID]["participantProtocol"] = "";
+			guest2Pane[confID]["participantType"] = "";
+		}
+		
+		//post this information to refresher.php to take action
+        if (hostPane[confID]["participantName"] && guestPane[confID]["participantName"]) {
             $.ajax({
                 type: "POST",
                 url: "refresher.php",
-                data: {action: "call", conferenceName: conferenceName, callNumber: callNumber},
+                data: {action: "setRecordView", view: view, conferenceName: conferenceName, hostName: hostPane[confID]["participantName"], hostType: hostPane[confID]["participantType"], hostProtocol: hostPane[confID]["participantProtocol"], guestName: guestPane[confID]["participantName"], guestType: guestPane[confID]["participantType"], guestProtocol: guestPane[confID]["participantProtocol"], guest2Name: guest2Pane[confID]["participantName"], guest2Type: guest2Pane[confID]["participantType"], guest2Protocol: guest2Pane[confID]["participantProtocol"], recorderName: recorderName, recorderType: recorderType, recorderProtocol: recorderProtocol},
                 dataType: "json",
                 cache: false,
 
                 success: function (r) {
                     if (r.alert) {
                         console.log(r.alert);
+                        //alert(r.alert);
                     }
                 }
             });
-        }
+        } else {
+			alert ("Can not set recorder view. Both a host and guest are required to be in the conference.");
+		}
+    });
+	
+	//Set the recorder view to split view with Host as important
+    $(document).on('mousedown', '.setTwoGuest', function () {
+        var conferenceName = $(this).closest("tr").find(".displayName").data("conferencename"),confID = $(this).closest("tr").find(".displayName").data("confid");
+
+		//post this information to refresher.php to take action
+        if (guestPane[confID] && guest2Pane[confID] && guestPane[confID]["participantName"] && guest2Pane[confID]["participantName"]) {
+            $.ajax({
+                type: "POST",
+                url: "refresher.php",
+                data: {action: "setTwoGuest", conferenceName: conferenceName, guestName: guestPane[confID]["participantName"], guestType: guestPane[confID]["participantType"], guestProtocol: guestPane[confID]["participantProtocol"], guest2Name: guest2Pane[confID]["participantName"], guest2Type: guest2Pane[confID]["participantType"], guest2Protocol: guest2Pane[confID]["participantProtocol"]},
+                dataType: "json",
+                cache: false,
+
+                success: function (r) {
+                    if (r.alert) {
+                        console.log(r.alert);
+                        //alert(r.alert);
+                    }
+                }
+            });
+        } else {
+			alert ("Can not set Two Guest view without two guests, duh!");
+		}
+    });
+
+	//Set a participant important
+    $(document).on('mousedown', '.importantCommand', function () {
+
+		var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).data("conf"), mark = $(this).attr("value"), importantBool = true;
+		
+		if (mark == "markImportant") {
+			importantBool = true;
+		} else {
+			importantBool = false;
+		}
+		
+		//alert(importantBool + " " + participantName + " " + participantProtocol + " " + participantType + " " + conferenceName);
+		
+		//post this information to refresher.php to take action
+		$.ajax({
+			type: "POST",
+			url: "refresher.php",
+			data: {action: "markImportant", participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName, importantBool: importantBool},
+			dataType: "json",
+			cache: false,
+
+			success: function (r) {
+				if (r.alert) {
+					console.log(r.alert);
+					//alert(r.alert);
+				}
+			}
+		});
     });
 
     //Drop all participants from a conference
@@ -1296,6 +1509,8 @@ $(document).ready(function () {
     $(document).on('click', '.liveShow', function () {
         var conferenceName = $(this).data("conf");
         //post this information to refresher.php to take action
+		
+		//alert(JSON.stringify(conferenceList));
 
         $.ajax({
             type: "POST",

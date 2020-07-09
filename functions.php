@@ -2,7 +2,7 @@
 
 // in this var you will get the absolute file path of the current file
 $current_file_path = dirname(__FILE__);
-require_once($current_file_path . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'config*.php');
+require_once($current_file_path . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'config.php');
 
 $deviceQuery = new stdClass();
 
@@ -122,11 +122,10 @@ function databaseConnect()
         mysqli_query($connection, $sql);
 
         $sql = "INSERT INTO `settings` (`name`, `displayName`, `value`) VALUES
-        ('timerParticipantsDB', 'MCU Participant Refresh Timer (ms)', '1000', 16),
-		('timerConferencesDB', 'MCU Conference Refresh Timer (ms)', '5000', 17),
-		('timerPanePlacementDB', 'MCU Pane Placement Refresh Timer (ms)', '3000', 18),
-		('timerWebRefresh', 'Web Interface Refresh Timer (ms)', '300', 19),
-		('sortField', 'Sort by Field (name or pane)', 'name', 20)";
+        ('timerParticipantsDB', 'MCU Participant Refresh Timer (ms)', '1000'),
+        ('timerConferencesDB', 'MCU Conference Refresh Timer (ms)', '5000'),
+        ('timerPanePlacementDB', 'MCU Pane Placement Refresh Timer (ms)', '3000'),
+        ('timerWebRefresh', 'Web Interface Refresh Timer (ms)', '300')";
         mysqli_query($connection, $sql);
         }
 
@@ -971,11 +970,11 @@ function allConferences($data, $connection)
 function codecInfo($conferenceName, $connection)
 {
     $conference = databaseQuery('conferenceInfo', $conferenceName);
-    $conferenceID = $conference['conferenceId'];
+    $conferenceTableId = $conference['id'];
 
     $sql = "SELECT * FROM participants
         WHERE displayName = '__'
-        AND conferenceTableId = '" . $conferenceID . "'";
+        AND conferenceTableId = '" . $conferenceTableId . "'";
 
     $codec = mysqli_fetch_array(mysqli_query($connection, $sql));
 
@@ -1227,7 +1226,7 @@ function panePlacementUpdate($data, $connection)
         $currentPanePaneResult = databaseQuery('panePlacementUpdate', $currentPane);
 
         //Check if the SQL query returned any entries for the moving participant that need to be deleted
-		if ($currentPanePaneResult != 0) {
+		if ($currentPanePaneResult) {
 			if (mysqli_num_rows($currentPanePaneResult) > 0) {
 
 				$currentPanes = mysqli_fetch_all($currentPanePaneResult, MYSQLI_ASSOC);

@@ -5,7 +5,7 @@ if (isset($_POST['submit'])) {
 
     foreach ($_POST as $name => $value) {
 
-        $array = "";
+        $array = array();
 
         if ($name != 'submit') {
             $array[$name]['name'] = $name;

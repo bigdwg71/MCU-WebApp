@@ -5,6 +5,11 @@ require_once 'functions.php';
 
 //This is a dummy post that is sent by the javascript in a loop,
 //we just have this here so this script can deal with other button presses too.
+
+//if (isset($_POST['action'])){
+//	echo json_encode(array('alert' => $_POST['action'])); 
+//}
+
 if (isset($_POST['action']) && $_POST['action'] == '') {
     //not sure why this is here
 } elseif (isset($_POST['action']) && $_POST['action'] == 'refreshWeb') {
@@ -37,6 +42,8 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 
     $destConferenceInfo = databaseQuery('conferenceInfo', $destConferenceName);
     $destConferenceTableId = $destConferenceInfo['id'];
+	
+	$codec = databaseQuery('codecInfo', $destConferenceName);
 
     //Get particpant info of the existing loop in the conference for use later in the function
     $findLoop['conferenceTableId'] = $sourceConferenceTableId;
@@ -82,6 +89,9 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
         $participantTableId = $participantInfo['id'];
 
         $participantPaneTarget = 0;
+		
+		$query['name'] = 'showIsLive';
+        $showIsLive = filter_var(databaseQuery('readIntSetting', $query), FILTER_VALIDATE_BOOLEAN);
 
         //if the source conference is a grid, then we need to save their current pane if they have one, replace them with a loop, then move them to the new conference
         if ($sourceType == "grid") {
@@ -202,8 +212,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                 );
             }
 
-            $query['name'] = 'showIsLive';
-            $showIsLive = filter_var(databaseQuery('readIntSetting', $query), FILTER_VALIDATE_BOOLEAN);
+            
 
             if ($showIsLive == false) {
 
@@ -231,7 +240,6 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 
                 //if the show is live/taping, then set a single pane layout for participant
                 $cpLayout = 'layout1';
-                $codec = databaseQuery('codecInfo', $destConferenceName);
 
                 //Set the layout for the participant
                 $setCPLayout = mcuCommand(
@@ -267,6 +275,29 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                       'participantType' => $participantType,
                       'newConferenceName' => $destConferenceName)
             );
+			
+			if ($showIsLive == true) {
+				$cpLayout = 'layout1';			
+				$checkFocus = mcuCommand(
+					array('prefix' => 'participant.'),
+					'modify',
+					array('authenticationUser' => $mcuUsername,
+						  'authenticationPassword' => $mcuPassword,
+						  'conferenceName' => $destConferenceName,
+						  'participantName' => $participantName,
+						  'participantProtocol' => $participantProtocol,
+						  'participantType' => $participantType,
+						  'operationScope' => 'activeState',
+						  'cpLayout' => $cpLayout,
+						  'focusType' => 'participant',
+						  'focusParticipant' =>
+								array('participantName' => $codec['participantName'],
+								'participantProtocol' => $codec['participantProtocol'],
+								'participantType' => $codec['participantType'])
+					)
+				);
+			}
+			
             //set moved participant to important
             $checkImportant = mcuCommand(
                 array('prefix' => 'participant.'),
@@ -406,8 +437,8 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
     echo json_encode(array('alert' => ''));
 
 } elseif (isset($_POST['action']) && $_POST['action'] == 'drop') {
-
-    $conferenceName = $_POST['conferenceName'];
+	
+	$conferenceName = $_POST['conferenceName'];
     $participantName = $_POST['participantName'];
     $participantProtocol = $_POST['participantProtocol'];
     $participantType = $_POST['participantType'];
@@ -431,6 +462,8 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
     $dropParticipant['action'] = "drop";
     $dropParticipant['participantTableId'] = $participantTableId;
     $dropParticipantResult = databaseQuery('participantUpdate', $dropParticipant);
+	
+	echo json_encode(array('alert' => ''));
     
 } elseif (isset($_POST['action']) && $_POST['action'] == 'changeLayout') {
     $conferenceName = $_POST['conferenceName'];
@@ -471,7 +504,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
     $conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
     $conferenceTableId = $conferenceInfo['id'];
 
-    //Make the participant non-important the database
+    //Change the conference layout in the DB
     $changeLayout['action'] = "changeLayout";
     $changeLayout['conferenceTableId'] = $conferenceTableId;
     $changeLayout['layout'] = $customLayout;
@@ -1030,11 +1063,10 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
         $currentConference = $conf['conferenceName'];
         $confLayout = $conf['customLayout'];
 
-
         $codec = databaseQuery('codecInfo', $currentConference);
-
+		
         //if the conference is in a single pane configuration, then skip
-        if ($confLayout != 1 && $currentConference != $waitingRoom) {
+        if ($currentConference != $waitingRoom) {
             foreach ($participantList as $part) {
                 if ($part['displayName'] != '__' && $part['displayName'] != '_' && $part['conferenceName'] == $currentConference) {
                     $result = mcuCommand(
@@ -1060,7 +1092,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
         }
     }
 
-    echo json_encode(array('alert' => ''));
+    echo json_encode(array('alert' => $codec));
 
 //Somone opened the conference layout popup
 } elseif (isset($_POST['action']) && $_POST['action'] == 'queryPanePlacement') {
@@ -1620,4 +1652,438 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 
     echo json_encode(array('alert' => '' ));
 
+} elseif (isset($_POST['action']) && $_POST['action'] == 'addRecorder') {
+    $number = $_POST['callNumber'];
+    $conferenceName = $_POST['conferenceName'];
+	$recorderPrefix = $_POST['recorderPrefix'];
+
+    //Place an outbound call from the MCU to the recorder
+    $resultAdd = mcuCommand(
+        array('prefix' => 'participant.'),
+        'add',
+        array('authenticationUser' => $mcuUsername,
+              'authenticationPassword' => $mcuPassword,
+              'conferenceName' => $conferenceName,
+              'participantProtocol' => 'sip',
+              'participantType' => 'ad_hoc',
+              'address' => $number,
+			  'displayNameOverrideStatus' => true,
+              'displayNameOverrideValue' => $recorderPrefix . $number
+			  )
+    );
+	
+	echo json_encode(array('alert' => '' ));
+	
+} elseif (isset($_POST['action']) && $_POST['action'] == 'setRecordView') {
+    
+	$view = $_POST['view'];
+	$conferenceName = $_POST['conferenceName'];
+	$hostName = $_POST["hostName"];
+	$hostType = $_POST["hostType"];
+	$hostProtocol = $_POST["hostProtocol"];
+	$guestName = $_POST["guestName"];
+	$guestType = $_POST["guestType"];
+	$guestProtocol = $_POST["guestProtocol"];
+	$guest2Name = $_POST["guest2Name"];
+	$guest2Type = $_POST["guest2Type"];
+	$guest2Protocol = $_POST["guest2Protocol"];
+	$recorderName = $_POST["recorderName"];
+	$recorderType = $_POST["recorderType"];
+	$recorderProtocol = $_POST["recorderProtocol"];
+	$cpLayout = "layout1";
+	$newConfLayout = 1;
+	
+	//Get conference current layout
+	$conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
+    $conferenceTableId = $conferenceInfo['id'];
+	$oldLayout = $conferenceInfo['layout'];
+	
+	$findPaticipant['participantName'] = $guestName;
+	$participantInfo = databaseQuery('participantInfo', $findPaticipant);
+	$participantImportant = filter_var($participantInfo['important'], FILTER_VALIDATE_BOOLEAN);
+	
+	if ($view == "split") {
+		
+		//Mark first guest important again
+		if ($participantImportant == false) {
+			$checkImportant = mcuCommand(
+				array('prefix' => 'participant.'),
+				'modify',
+				array('authenticationUser' => $mcuUsername,
+					  'authenticationPassword' => $mcuPassword,
+					  'conferenceName' => $conferenceName,
+					  'participantName' => $guestName,
+					  'participantProtocol' => $guestProtocol,
+					  'participantType' => $guestType,
+					  'operationScope' => 'activeState',
+					  'important' => true)
+			);
+		}
+		
+		$newConfLayout = 1;
+		
+		if ($oldLayout != $newConfLayout) {
+			$confLayout = mcuCommand(
+				array('prefix' => 'conference.'),
+				'modify',
+				array('authenticationUser' => $mcuUsername,
+					  'authenticationPassword' => $mcuPassword,
+					  'conferenceName' => $conferenceName,
+					  'customLayoutEnabled' => true,
+					  'customLayout' => $newConfLayout,
+					  'setAllParticipantsToCustomLayout' => true,
+					  'newParticipantsCustomLayout' => true)
+			);
+			
+			//Change the conference layout in the DB
+			$changeLayout['action'] = "changeLayout";
+			$changeLayout['conferenceTableId'] = $conferenceTableId;
+			$changeLayout['layout'] = $newConfLayout;
+			$changeLayoutResult = databaseQuery('conferenceUpdate', $changeLayout);
+			
+		}
+		
+		$cpLayout = "layout16";
+		//Change Participant layout and give Host focus to appear on the left
+		$setCPLayout = mcuCommand(
+			array('prefix' => 'participant.'),
+			'modify',
+			array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $recorderName,
+			  'participantProtocol' => $recorderProtocol,
+			  'participantType' => $recorderType,
+				  'operationScope' => 'activeState',
+				  'cpLayout' => $cpLayout,
+				  'focusType' => 'participant',
+				  'focusParticipant' =>
+						array('participantName' => $hostName,
+						'participantProtocol' => $hostProtocol,
+						'participantType' => $hostType)
+			)
+		);
+		
+	} elseif ($view == "triple") {
+		
+		//Mark first guest important again
+		if ($participantImportant == false) {
+			$checkImportant = mcuCommand(
+				array('prefix' => 'participant.'),
+				'modify',
+				array('authenticationUser' => $mcuUsername,
+					  'authenticationPassword' => $mcuPassword,
+					  'conferenceName' => $conferenceName,
+					  'participantName' => $guestName,
+					  'participantProtocol' => $guestProtocol,
+					  'participantType' => $guestType,
+					  'operationScope' => 'activeState',
+					  'important' => true)
+			);
+		}
+		
+		$newConfLayout = 16;
+		
+		if ($oldLayout != $newConfLayout) {
+			$confLayout = mcuCommand(
+				array('prefix' => 'conference.'),
+				'modify',
+				array('authenticationUser' => $mcuUsername,
+					  'authenticationPassword' => $mcuPassword,
+					  'conferenceName' => $conferenceName,
+					  'customLayoutEnabled' => true,
+					  'customLayout' => $newConfLayout,
+					  'setAllParticipantsToCustomLayout' => true,
+					  'newParticipantsCustomLayout' => true)
+			);
+			
+			//Change the conference layout in the DB
+			$changeLayout['action'] = "changeLayout";
+			$changeLayout['conferenceTableId'] = $conferenceTableId;
+			$changeLayout['layout'] = $newConfLayout;
+			$changeLayoutResult = databaseQuery('conferenceUpdate', $changeLayout);
+			
+		}
+		
+		$cpLayout = "layout17";
+		//Change Participant layout and give Host focus to appear on the left
+				
+		$setCPLayout = mcuCommand(
+			array('prefix' => 'participant.'),
+			'modify',
+			array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $recorderName,
+			  'participantProtocol' => $recorderProtocol,
+			  'participantType' => $recorderType,
+				  'operationScope' => 'activeState',
+				  'cpLayout' => $cpLayout,
+				  'focusType' => 'participant',
+				  'focusParticipant' =>
+					array('participantName' => $hostName,
+					'participantProtocol' => $hostProtocol,
+					'participantType' => $hostType)
+			)
+		);
+
+	} elseif ($view == "host") {
+		
+		//Change Participant layout and give Host focus to appear fullscreen
+		$setCPLayout = mcuCommand(
+			array('prefix' => 'participant.'),
+			'modify',
+			array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $recorderName,
+			  'participantProtocol' => $recorderProtocol,
+			  'participantType' => $recorderType,
+				  'operationScope' => 'activeState',
+				  'cpLayout' => $cpLayout,
+				  'focusType' => 'participant',
+				  'focusParticipant' =>
+						array('participantName' => $hostName,
+						'participantProtocol' => $hostProtocol,
+						'participantType' => $hostType)
+			)
+		);
+	} elseif ($view == "guest") {
+		//Change Participant layout and give guest focus to appear fullscreen
+		$setCPLayout = mcuCommand(
+			array('prefix' => 'participant.'),
+			'modify',
+			array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $recorderName,
+			  'participantProtocol' => $recorderProtocol,
+			  'participantType' => $recorderType,
+				  'operationScope' => 'activeState',
+				  'cpLayout' => $cpLayout,
+				  'focusType' => 'participant',
+				  'focusParticipant' =>
+						array('participantName' => $guestName,
+						'participantProtocol' => $guestProtocol,
+						'participantType' => $guestType)
+			)
+		);
+	} elseif ($view == "default") {
+		
+		$newConfLayout = 1;
+		
+		if ($oldLayout != $newConfLayout) {
+			$confLayout = mcuCommand(
+				array('prefix' => 'conference.'),
+				'modify',
+				array('authenticationUser' => $mcuUsername,
+					  'authenticationPassword' => $mcuPassword,
+					  'conferenceName' => $conferenceName,
+					  'customLayoutEnabled' => true,
+					  'customLayout' => $newConfLayout,
+					  'setAllParticipantsToCustomLayout' => true,
+					  'newParticipantsCustomLayout' => true)
+			);
+			
+			//Change the conference layout in the DB
+			$changeLayout['action'] = "changeLayout";
+			$changeLayout['conferenceTableId'] = $conferenceTableId;
+			$changeLayout['layout'] = $newConfLayout;
+			$changeLayoutResult = databaseQuery('conferenceUpdate', $changeLayout);
+			
+		}
+		
+		//Change Participant layout and reset to single pane, voice-activated layout
+		$setCPLayout = mcuCommand(
+			array('prefix' => 'participant.'),
+			'modify',
+			array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $recorderName,
+			  'participantProtocol' => $recorderProtocol,
+			  'participantType' => $recorderType,
+			  'operationScope' => 'activeState',
+			  'cpLayout' => 'conferenceCustom',
+              'focusType' => 'voiceActivated'
+			)
+		);
+	}
+	
+	echo json_encode(array('alert' => ''));
+	
+} elseif (isset($_POST['action']) && $_POST['action'] == 'setTwoGuest') {
+
+	$conferenceName = $_POST['conferenceName'];
+	$guestName = $_POST["guestName"];
+	$guestType = $_POST["guestType"];
+	$guestProtocol = $_POST["guestProtocol"];
+	$guest2Name = $_POST["guest2Name"];
+	$guest2Type = $_POST["guest2Type"];
+	$guest2Protocol = $_POST["guest2Protocol"];
+	$guestLayout = "layout58";
+	$codecLayout = 16;
+	
+	//Get conference current layout
+	$conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
+    $conferenceTableId = $conferenceInfo['id'];
+	$oldLayout = $conferenceInfo['layout'];
+	$codec = databaseQuery('codecInfo', $conferenceName);
+	
+	$findPaticipant['participantName'] = $guestName;
+	$participantInfo = databaseQuery('participantInfo', $findPaticipant);
+	$participantImportant = filter_var($participantInfo['important'], FILTER_VALIDATE_BOOLEAN);
+	
+	//Set codec to see split with Guest2 on the left and guest 1 on the right.
+	$confLayout = mcuCommand(
+		array('prefix' => 'conference.'),
+		'modify',
+		array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'customLayoutEnabled' => true,
+			  'customLayout' => $codecLayout)
+	);
+	
+	//Set pane placement for the conference
+	$setParticipantPane = mcuCommand(
+		array('prefix' => 'conference.paneplacement.'),
+		'modify',
+		array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'enabled' => true,
+			  'panes' => array(['index' => 1,
+								'type' => 'participant',
+								'participantName' => $guest2Name,
+								'participantProtocol' => $guest2Protocol,
+								'participantType' => $guest2Type],
+								['index' => 2,
+								'type' => 'participant',
+								'participantName' => $guestName,
+								'participantProtocol' => $guestProtocol,
+								'participantType' => $guestType]))
+	);
+	
+	//Change the conference layout in the DB
+	$changeLayout['action'] = "changeLayout";
+	$changeLayout['conferenceTableId'] = $conferenceTableId;
+	$changeLayout['layout'] = $codecLayout;
+	$changeLayoutResult = databaseQuery('conferenceUpdate', $changeLayout);
+	
+	//once panes are set, mark codec important to put the codec in the lower right for participants
+	
+	$checkImportant = mcuCommand(
+		array('prefix' => 'participant.'),
+		'modify',
+		array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $guestName,
+			  'participantProtocol' => $guestProtocol,
+			  'participantType' => $guestType,
+			  'operationScope' => 'activeState',
+			  'important' => false
+			)
+	);
+	
+	$checkImportant2 = mcuCommand(
+		array('prefix' => 'participant.'),
+		'modify',
+		array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $guest2Name,
+			  'participantProtocol' => $guest2Protocol,
+			  'participantType' => $guest2Type,
+			  'operationScope' => 'activeState',
+			  'important' => false
+			)
+	);
+	
+	
+	//Set Guest1 to see codec in layout58
+	$cpLayout = "layout58";
+	$setCPLayout = mcuCommand(
+		array('prefix' => 'participant.'),
+		'modify',
+		array('authenticationUser' => $mcuUsername,
+		  'authenticationPassword' => $mcuPassword,
+		  'conferenceName' => $conferenceName,
+		  'participantName' => $guestName,
+		  'participantProtocol' => $guestProtocol,
+		  'participantType' => $guestType,
+			  'operationScope' => 'activeState',
+			  'cpLayout' => $cpLayout,
+			  'focusType' => 'participant',
+			  'focusParticipant' =>
+					array('participantName' => $codec['participantName'],
+						  'participantProtocol' => $codec['participantProtocol'],
+						  'participantType' => $codec['participantType'])
+		)
+	);
+	
+	//Set Guest2 to see codec in layout58
+	$cpLayout = "layout58";
+	$setCPLayout = mcuCommand(
+		array('prefix' => 'participant.'),
+		'modify',
+		array('authenticationUser' => $mcuUsername,
+		  'authenticationPassword' => $mcuPassword,
+		  'conferenceName' => $conferenceName,
+		  'participantName' => $guest2Name,
+		  'participantProtocol' => $guest2Protocol,
+		  'participantType' => $guest2Type,
+			  'operationScope' => 'activeState',
+			  'cpLayout' => $cpLayout,
+			  'focusType' => 'participant',
+			  'focusParticipant' =>
+					array('participantName' => $codec['participantName'],
+						  'participantProtocol' => $codec['participantProtocol'],
+						  'participantType' => $codec['participantType'])
+		)
+	);
+	
+	echo json_encode(array('alert' => ''));
+	
+} elseif (isset($_POST['action']) && $_POST['action'] == 'markImportant') {
+	
+	
+	$importantBool = filter_var($_POST['importantBool'], FILTER_VALIDATE_BOOLEAN);
+    $conferenceName = $_POST['conferenceName'];
+	$participantName = $_POST['participantName'];
+	$participantProtocol = $_POST['participantProtocol'];
+	$participantType = $_POST['participantType'];
+
+	
+    //Place an outbound call from the MCU to the recorder
+	$checkImportant = mcuCommand(
+		array('prefix' => 'participant.'),
+		'modify',
+		array('authenticationUser' => $mcuUsername,
+			  'authenticationPassword' => $mcuPassword,
+			  'conferenceName' => $conferenceName,
+			  'participantName' => $participantName,
+			  'participantProtocol' => $participantProtocol,
+			  'participantType' => $participantType,
+			  'operationScope' => 'activeState',
+			  'important' => $importantBool
+			)
+	);
+	
+	//Set variables for SQL queries in following actions
+	$conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
+    $conferenceTableId = $conferenceInfo['id'];
+    $findPaticipant['participantName'] = $participantName;
+    $participantInfo = databaseQuery('participantInfo', $findPaticipant);
+    $participantTableId = $participantInfo['id'];
+	
+	$importantParticipant['action'] = "importantParticipant";
+    $importantParticipant['participantTableId'] = $participantTableId;
+    $importantParticipant['conferenceTableId'] = $conferenceTableId;
+    $importantParticipant['importantValue'] = $importantBool;
+    $importantParticipantResult = databaseQuery('participantUpdate', $importantParticipant);
+	
+	echo json_encode(array('alert' => ''));
+	
 }
