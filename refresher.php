@@ -1017,7 +1017,9 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
         $cpLayout = 'layout' . $confLayout;
 
         //if the conference is in a single pane configuration, then skip
-        if ($confLayout != 1 && $currentConference != $waitingRoom) {
+		//if ($confLayout != 1 && $currentConference != $waitingRoom) {
+        //we were purposely excluding layout1 (single pane). I don't remember why. But undoing it for now.
+		if ($currentConference != $waitingRoom) {
             foreach ($participantList as $part) {
                 if ($part['displayName'] != '__' && $part['displayName'] != '_' && $part['conferenceName'] == $currentConference) {
                     $result = mcuCommand(
