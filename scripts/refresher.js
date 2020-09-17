@@ -3,6 +3,7 @@
 //Set deployment specific variables
 var participantList;
 var conferenceList;
+var codecList;
 var waitingRoom = "";
 var showIsLive;
 var refreshWebTimer;
@@ -41,12 +42,15 @@ function layoutsDialog(dialogId) {
 
 //Grabs all the data from the API response and build the tables in html
 function refreshWeb(refreshType) {
+	//console.log('JS refreshType: ' + refreshType);
     "use strict";
     //call refresher.php poster with "action" pressed.
     $.customPOST({action: 'refreshWeb', type: refreshType}, function (r) {
+		//console.log('JS R: ' + JSON.stringify(r));
         if (r.conferenceArray && r.participantArray) {
             participantList = r.participantArray;
             conferenceList = r.conferenceArray;
+			codecList = r.codecArray;
 			hostPane.length = 0;
 			guestPane.length = 0;
 			guest2Pane.length = 0;
@@ -136,6 +140,7 @@ function refreshWeb(refreshType) {
             //Loop through each array in alphabetical order
             $.each(conferenceList, function (conferenceArrayInnerKey, conferenceArrayInnerValue) {
                 currentConference = conferenceArrayInnerValue.conferenceName;
+				
                 var elementCounter = 0,
                     participantCounter = 0,
                     customLayout,
@@ -526,6 +531,16 @@ function refreshWeb(refreshType) {
                 $.each(participantList, function (participantArrayInnerKey, participantArrayInnerValue) {
 
                     if (participantArrayInnerValue.conferenceName === currentConference) {
+						
+						var codecFocusParticipant = 0;
+						
+						if (currentConference in codecList && codecList[currentConference]['focusType'] === "participant") {
+							if (participantArrayInnerValue.participantName == codecList[currentConference]['focusParticipant']) {
+								codecFocusParticipant = codecList[currentConference]['focusParticipant']
+								//alert(participantArrayInnerValue.participantName);
+								//alert(codecFocusParticipant);
+							}
+						}
 
                         //participantCounter = participantCounter + 1;
 
@@ -564,9 +579,18 @@ function refreshWeb(refreshType) {
 								if (!participantArrayInnerValue.displayName.startsWith(recorderPrefix)) {								
 								//Important status
 									if (participantArrayInnerValue.important === false || participantArrayInnerValue.important === '0') {
-										 content[0] += '<span class="importantCommand icon icon-star icon-2x" value="markImportant" data-conf="' + currentConference + '"></span>';
+										content[0] += '<span class="importantCommand icon icon-star icon-2x" value="markImportant" data-conf="' + currentConference + '"></span>';
 									} else {
+										//alert("Important Person!");
 										content[0] += '<span class="importantCommand importantTrue icon icon-star icon-2x" value="unmarkImportant" data-conf="' + currentConference + '"></span>';
+									}
+									
+									//Codec Fullscreen
+									if (codecFocusParticipant == 0) {
+										content[0] += '<span class="fullscreenCommand icon icon-fullscreen icon-2x" value="markFullscreen" data-conf="' + currentConference + '"></span>';
+									} else {
+										//alert(codecFocusParticipant);
+										content[0] += '<span class="fullscreenCommand fullscreenTrue icon icon-fullscreen icon-2x" value="unmarkFullscreen" data-conf="' + currentConference + '"></span>';
 									}
 								}
 
@@ -800,6 +824,7 @@ function refreshWeb(refreshType) {
         if (r.alert) {
             console.log(r.alert);
         }
+		
     });
 }
 
@@ -926,6 +951,7 @@ function writePanesDB() {
 $.customPOST = function (data, callback) {
     "use strict";
     $.post('refresher.php', data, callback, 'json');
+	//console.log('data: ' + JSON.stringify(data));
 };
 
 //Catches all button clicks on the page
@@ -944,7 +970,7 @@ $(document).ready(function () {
             if (r.alert) {
                 console.log(r.alert);
             } else {
-                waitingRoom = r.settings.waitingRoom.value;
+				waitingRoom = r.settings.waitingRoom.value;
                 refreshWebTimer = r.settings.timerWebRefresh.value;
                 writeConferenceTimer = r.settings.timerConferencesDB.value;
                 writeParticipantTimer = r.settings.timerParticipantsDB.value;
@@ -958,11 +984,10 @@ $(document).ready(function () {
                 refreshWeb('first');
 
                 //Set the interval for how often we want the page to refresh
-				//if (pauseRefresh == false) {
-					refreshWebInterval = setInterval(function () {
-						refreshWeb('refresh');
-					}, refreshWebTimer);
-				//}
+				refreshWebInterval = setInterval(function () {
+					refreshWeb('refresh');
+				}, refreshWebTimer);
+
 
                 writeConferenceInterval = setInterval(writeConferenceEnumerate, writeConferenceTimer);
                 writeParticipantInterval = setInterval(writeParticipantEnumerate, writeParticipantTimer);
@@ -1391,6 +1416,34 @@ $(document).ready(function () {
 			type: "POST",
 			url: "refresher.php",
 			data: {action: "markImportant", participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName, importantBool: importantBool},
+			dataType: "json",
+			cache: false,
+
+			success: function (r) {
+				if (r.alert) {
+					console.log(r.alert);
+					//alert(r.alert);
+				}
+			}
+		});
+    });
+	
+	//Set conference codec fullscreen to a selected participant
+    $(document).on('mousedown', '.fullscreenCommand', function () {
+
+		var participantName = $(this).closest("tr").find(".displayName").data("participantname"), participantProtocol = $(this).closest("tr").find(".displayName").data("participantprotocol"), participantType = $(this).closest("tr").find(".displayName").data("participanttype"), conferenceName = $(this).data("conf"), mark = $(this).attr("value"), fullscreenBool = true;
+		
+		if (mark == "markFullscreen") {
+			fullscreenBool = true;
+		} else {
+			fullscreenBool = false;
+		}
+		
+		//post this information to refresher.php to take action
+		$.ajax({
+			type: "POST",
+			url: "refresher.php",
+			data: {action: "markFullscreen", participantName: participantName, participantProtocol: participantProtocol, participantType: participantType, conferenceName: conferenceName, fullscreenBool: fullscreenBool},
 			dataType: "json",
 			cache: false,
 

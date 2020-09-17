@@ -29,8 +29,6 @@ function mcuCommand($options, $commandSuffix, $command)
         // will be used if available (full PHP else))
         $client = XML_RPC2_Client::create($mcuRpc, $options);
 
-        //if (preg_match("/important/", implod("", $command))) error_log(implod("", $command));
-
     try {
 
         // Because of the prefix specified in the $options array, indeed,  we will call
@@ -118,7 +116,16 @@ function databaseConnect()
         ('codec6', 'Conference 6 Codec Number'),
         ('codec7', 'Conference 7 Codec Number'),
         ('codec8', 'Conference 8 Codec Number'),
-        ('codec9', 'Conference 9 Codec Number')";
+        ('codec9', 'Conference 9 Codec Number'),
+		('timerParticipantsDB', 'MCU Participant Refresh Timer (ms)'),
+		('timerConferencesDB', 'MCU Conference Refresh Timer (ms)'),
+		('timerPanePlacementDB', 'MCU Pane Placement Refresh Timer (ms)'),
+		('timerWebRefresh', 'Web Interface Refresh Timer (ms)'),
+		('sortField', 'Sort by Field (name or pane)'),
+		('hostID', 'Host Caller ID'),
+		('guest1ID', 'Guest 1 Caller ID'),
+		('guest2ID', 'Guest 2 Caller ID'),
+		('recorderPrefix', 'Recorder Prefix');";
         mysqli_query($connection, $sql);
 
         $sql = "INSERT INTO `settings` (`name`, `displayName`, `value`) VALUES
@@ -131,10 +138,11 @@ function databaseConnect()
 
         $sql = "CREATE TABLE IF NOT EXISTS `conferences` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `conferenceName` varchar(31) NOT NULL,
+            `conferenceName` varchar(256) NOT NULL,
             `conferenceId` int(31) NOT NULL,
             `layout` int(31) NOT NULL,
             `savedLayout` int(11) DEFAULT NULL,
+			`autoExpand` tinyint(1) NOT NULL DEFAULT '0',
             PRIMARY KEY (`id`),
             UNIQUE KEY `conferenceId` (`conferenceId`),
             UNIQUE KEY `conferenceName` (`conferenceName`))
@@ -145,15 +153,17 @@ function databaseConnect()
           `id` int(11) NOT NULL AUTO_INCREMENT,
           `participantName` varchar(256) NOT NULL,
           `participantPreview` varchar(256) DEFAULT NULL,
-          `displayName` varchar(31) NOT NULL,
+          `displayName` varchar(256) NOT NULL,
           `audioRxMuted` tinyint(1) NOT NULL,
           `videoRxMuted` tinyint(1) NOT NULL,
           `audioTxMuted` tinyint(1) NOT NULL,
           `videoTxMuted` tinyint(1) NOT NULL,
-          `participantProtocol` varchar(4) NOT NULL,
-          `participantType` varchar(10) NOT NULL,
+		  `focusType` varchar(256) NOT NULL,
+		  `focusParticipant` varchar(256) NOT NULL DEFAULT '0',
+          `participantProtocol` varchar(256) NOT NULL,
+          `participantType` varchar(256) NOT NULL,
           `conferenceTableId` int(11) NOT NULL,
-          `cpLayout` varchar(255) NOT NULL,
+          `cpLayout` varchar(256) NOT NULL,
           `important` tinyint(1) NOT NULL,
           `packetLossWarning` tinyint(1) NOT NULL,
           `packetLossCritical` tinyint(1) NOT NULL,
@@ -233,6 +243,14 @@ function databaseQuery($action, $data)
         $result = conferenceInfo($data, $connection);
     } elseif ($action == 'codecInfo') {
         $result = codecInfo($data, $connection);
+    } elseif ($action == 'updateConferenceAutoExpand') {
+        $result = updateConferenceAutoExpand($data, $connection);
+    } elseif ($action == 'readConferenceAutoExpand') {
+        $result = readConferenceAutoExpand($data, $connection);
+    } elseif ($action == 'conferenceCount') {
+        $result = conferenceCount($data, $connection);
+    } elseif ($action == 'updateConferenceLayout') {
+        $result = updateConferenceLayout($data, $connection);
     } else {
         $result = array('alert' => 'DB function not found!');
     }
@@ -264,6 +282,7 @@ function refreshWeb($mcuUsername, $mcuPassword)
 
     $participantArray = [];
     $conferenceArray = [];
+	$codecArray = [];
 
     //Build the conference array to pass back to refresher.js to present to the page
     $allConferences = databaseQuery('allConferences', 'NA');
@@ -294,25 +313,40 @@ function refreshWeb($mcuUsername, $mcuPassword)
                 $participantArray[$i]['participantName'] = $participantInstance['participantName'];
                 $data['participantName'] = $participantInstance['participantName'];
                 $data['displayName'] = addslashes($participantInstance['displayName']);
-                $data['conferenceName'] = $participantInstance['conferenceName'];
-
+                $conferenceName = $participantInstance['conferenceName'];
+				$data['conferenceName'] = $conferenceName;
+				
+				//error_log("participantInstance: " . json_encode($participantInstance));
                 $currentPane = databaseQuery('findCurrentPane', $data);
-                if ($currentPane['pane'] == null || $participantInstance['displayName'] == '_') {
+                if (!isset($currentPane['pane']) || $participantInstance['displayName'] == '_') {
                     $participantArray[$i]['pane'] = '';
                 } else {
                     $participantArray[$i]['pane'] = $currentPane['pane'];
                 }
-
+				
                 $participantArray[$i]['participantPreview'] = $participantInstance['participantPreview'];
                 $participantArray[$i]['displayName'] = $participantInstance['displayName'];
-                $participantArray[$i]['audioRxMuted'] =
-                    filter_var($participantInstance['audioRxMuted'], FILTER_VALIDATE_BOOLEAN);
-                $participantArray[$i]['videoRxMuted'] =
-                    filter_var($participantInstance['videoRxMuted'], FILTER_VALIDATE_BOOLEAN);
-                $participantArray[$i]['audioTxMuted'] =
-                    filter_var($participantInstance['audioTxMuted'], FILTER_VALIDATE_BOOLEAN);
-                $participantArray[$i]['videoTxMuted'] =
-                    filter_var($participantInstance['videoTxMuted'], FILTER_VALIDATE_BOOLEAN);
+                $participantArray[$i]['audioRxMuted'] = filter_var($participantInstance['audioRxMuted'], FILTER_VALIDATE_BOOLEAN);
+                $participantArray[$i]['videoRxMuted'] = filter_var($participantInstance['videoRxMuted'], FILTER_VALIDATE_BOOLEAN);
+                $participantArray[$i]['audioTxMuted'] = filter_var($participantInstance['audioTxMuted'], FILTER_VALIDATE_BOOLEAN);
+                $participantArray[$i]['videoTxMuted'] = filter_var($participantInstance['videoTxMuted'], FILTER_VALIDATE_BOOLEAN);
+				$participantArray[$i]['focusType'] = $participantInstance['focusType'];
+				
+				//Check if its a codec to build an array of Codecs
+				if ($participantInstance['displayName'] == '__') {
+					$codecArray[$conferenceName]['conferenceName'] = $conferenceName;
+					$codecArray[$conferenceName]['participantName'] = $participantInstance['participantName'];
+					$codecArray[$conferenceName]['focusType'] = $participantInstance['focusType'];
+				}
+				
+				//If its a codec AND its in focusType of participant, add the participant
+				if ($participantInstance['focusType'] == "participant" && $participantInstance['displayName'] == '__') {
+					$participantArray[$i]['focusParticipant'] = $participantInstance['focusParticipant'];
+					$codecArray[$conferenceName]['focusParticipant'] = $participantInstance['focusParticipant'];
+				} else {
+					$participantArray[$i]['focusParticipant'] = 0;
+				}
+				
                 $participantArray[$i]['participantProtocol'] = $participantInstance['participantProtocol'];
                 $participantArray[$i]['participantType'] = $participantInstance['participantType'];
                 $participantArray[$i]['conferenceName'] = $participantInstance['conferenceName'];
@@ -323,12 +357,9 @@ function refreshWeb($mcuUsername, $mcuPassword)
                     $participantArray[$i]['cpLayout'] = '';
                 }
 
-                $participantArray[$i]['important'] =
-                    filter_var($participantInstance['important'], FILTER_VALIDATE_BOOLEAN);
-                $participantArray[$i]['packetLossWarning'] =
-                    filter_var($participantInstance['packetLossWarning'], FILTER_VALIDATE_BOOLEAN);
-                $participantArray[$i]['packetLossCritical'] =
-                    filter_var($participantInstance['packetLossCritical'], FILTER_VALIDATE_BOOLEAN);
+                $participantArray[$i]['important'] = filter_var($participantInstance['important'], FILTER_VALIDATE_BOOLEAN);
+                $participantArray[$i]['packetLossWarning'] = filter_var($participantInstance['packetLossWarning'], FILTER_VALIDATE_BOOLEAN);
+                $participantArray[$i]['packetLossCritical'] = filter_var($participantInstance['packetLossCritical'], FILTER_VALIDATE_BOOLEAN);
                 $i++;
             }
         }
@@ -358,6 +389,7 @@ function refreshWeb($mcuUsername, $mcuPassword)
     echo json_encode(
         array('participantArray' => $participantArray,
               'conferenceArray' => $conferenceArray,
+			  'codecArray' => $codecArray,
               'showIsLive' => $showIsLive,
               'debugArray' => $debugArray,
               'appVersion' => $appVersion,
@@ -425,6 +457,17 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
                 $participantArray[$i]['videoRxMuted'] = $participantInstance['currentState']['videoRxMuted'];
                 $participantArray[$i]['audioTxMuted'] = $participantInstance['currentState']['audioTxMuted'];
                 $participantArray[$i]['videoTxMuted'] = $participantInstance['currentState']['videoTxMuted'];
+				$participantArray[$i]['focusType'] = $participantInstance['currentState']['focusType'];
+				
+				if ($participantInstance['currentState']['focusType'] == "participant") {
+					//error_log("participantInstance: " . json_encode($participantInstance));
+					//error_log("focusType: " . $participantArray[$i]['focusType']);
+					//error_log("focusParticipant: " . $participantInstance['currentState']['focusParticipant']['participantName']);
+					$participantArray[$i]['focusParticipant'] = $participantInstance['currentState']['focusParticipant']['participantName'];
+				} else {
+					$participantArray[$i]['focusParticipant'] = 0;
+				}
+				
                 $participantArray[$i]['participantProtocol'] = $participantInstance['participantProtocol'];
                 $participantArray[$i]['participantType'] = $participantInstance['participantType'];
                 $participantArray[$i]['conferenceName'] = $participantInstance['conferenceName'];
@@ -437,8 +480,7 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 
                 $participantArray[$i]['important'] = $participantInstance['currentState']['important'];
                 $participantArray[$i]['packetLossWarning'] = $participantInstance['currentState']['packetLossWarning'];
-                $participantArray[$i]['packetLossCritical'] =
-                    $participantInstance['currentState']['packetLossCritical'];
+                $participantArray[$i]['packetLossCritical'] = $participantInstance['currentState']['packetLossCritical'];
                 $i++;
 
                 //track the number of participants in the waiting room
@@ -451,7 +493,65 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
             }
         }
     }
-
+	//handle auto-expanding conferences
+	$autoExpandConferences = databaseQuery('readConferenceAutoExpand', 'NA');
+	
+	//error_log("autoExpandConferences: " . json_encode($autoExpandConferences));
+	
+	if ($autoExpandConferences != 0) {
+		foreach ($autoExpandConferences as $conference) {
+			
+			$conferenceName = $conference['conferenceName'];
+			$conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
+			$conferenceCount = databaseQuery('conferenceCount', $conferenceInfo['id']);
+			$currentLayout = $conference['layout'];
+			
+			//error_log("conferenceALL: " . json_encode($conference));
+			//error_log("conference: " . $conferenceName);
+			//error_log("count: " . $conferenceCount);
+			//error_log("layout: " . $currentLayout);
+			
+			if ($conferenceCount >= 0 && $conferenceCount <= 2) {
+				$newConferenceLayout = 1;
+			} elseif ($conferenceCount >= 3 && $conferenceCount <= 5) {
+				$newConferenceLayout = 2;
+			} elseif ($conferenceCount == 6 || $conferenceCount == 7) {
+				$newConferenceLayout = 8;
+			} elseif ($conferenceCount == 8 || $conferenceCount == 9) {
+				$newConferenceLayout = 53;
+			} elseif ($conferenceCount == 10) {
+				$newConferenceLayout = 3;
+			} elseif ($conferenceCount >= 11 && $conferenceCount <= 13) {
+				$newConferenceLayout = 9;
+			} elseif ($conferenceCount >= 14 && $conferenceCount <= 17) {
+				$newConferenceLayout = 4;
+			} elseif ($conferenceCount >= 18) {
+				$newConferenceLayout = 43;
+			}
+			
+			//error_log("new layout: " . $newConferenceLayout);
+			
+			if ($currentLayout != $newConferenceLayout) {
+				$result = mcuCommand(
+					array('prefix' => 'conference.'),
+					'modify',
+					array('authenticationUser' => $mcuUsername,
+						  'authenticationPassword' => $mcuPassword,
+						  'conferenceName' => $conferenceName,
+						  'customLayoutEnabled' => true,
+						  'customLayout' => $newConferenceLayout,
+						  'newParticipantsCustomLayout' => true,
+						  'setAllParticipantsToCustomLayout' => true)
+				);
+				
+				$conferenceInfo['layout'] = $newConferenceLayout;
+				
+				$changeLayout = databaseQuery('updateConferenceLayout', $conferenceInfo);
+			}
+		}
+	}
+	
+	/*
     //Get current waitingRoomCount from DB
     $queryRead['name'] = 'waitingRoomCount';
     $dbWaitingRoomCount = filter_var(databaseQuery('readIntSetting', $queryRead), FILTER_VALIDATE_INT);
@@ -494,7 +594,8 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
                   'setAllParticipantsToCustomLayout' => true)
         );
     }
-
+	*/
+	
     //Write participant info to database
     databaseQuery('updateParticipantsDB', $participantArray);
     echo json_encode(array('alert' => ''));
@@ -505,7 +606,7 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 function writeConferenceEnumerate($mcuUsername, $mcuPassword)
 {
     $conferenceArray = [];
-
+	
     $conferenceEnumerate = mcuCommand(
         array('prefix' => 'conference.'),
         'enumerate',
@@ -513,7 +614,9 @@ function writeConferenceEnumerate($mcuUsername, $mcuPassword)
         'authenticationPassword' => $mcuPassword,
         'enumerateFilter' => 'active')
     );
-
+	
+	
+	
     while (empty($conferenceEnumerate['enumerateID']) == false) {
         $conferenceEnumerateAdd = mcuCommand(
             array('prefix' => 'conference.'),
@@ -527,6 +630,8 @@ function writeConferenceEnumerate($mcuUsername, $mcuPassword)
         unset($conferenceEnumerate['enumerateID']);
         unset($conferenceEnumerate['currentRevision']);
         $conferenceEnumerate = array_merge_recursive($conferenceEnumerate, $conferenceEnumerateAdd);
+		
+		
     }
 
     if (isset($conferenceEnumerate['conferences'])) {
@@ -539,9 +644,10 @@ function writeConferenceEnumerate($mcuUsername, $mcuPassword)
             }
         }
     }
-
+	
+	
     $conferenceWrite = databaseQuery('updateConferencesDB', $conferenceArray);
-
+	
     return($conferenceWrite);
 }
 
@@ -633,7 +739,9 @@ function updateConferencesDB($data, $connection)
             VALUES ('".mysqli_real_escape_string($connection, $row['conferenceName'])."',
             '".mysqli_real_escape_string($connection, $row['uniqueId'])."',
             '".mysqli_real_escape_string($connection, $row['customLayout'])."')";
-            $mysqlquery = mysqli_query($connection, $sql);
+			
+			$mysqlquery = mysqli_query($connection, $sql);
+			
         } else {
              $sql = "UPDATE conferences SET conferenceName ='".mysqli_real_escape_string($connection, $row['conferenceName'])."', layout = '".mysqli_real_escape_string($connection, $row['customLayout'])."'
             WHERE conferenceId = '".mysqli_real_escape_string($connection, $row['uniqueId'])."'";
@@ -660,6 +768,8 @@ function updateConferencesDB($data, $connection)
         $sql = "DELETE FROM conferences WHERE conferenceId NOT IN (".$existingConferences.")";
     }
 
+	
+
     $mysqlquery = mysqli_query($connection, $sql);
     return($result);
 }
@@ -671,6 +781,8 @@ function updateParticipantsDB($data, $connection)
     $updateParticipant = "";
     $conferenceTableId = "";
     $insertParticipant = "EMPTY";
+	
+	
 
     foreach ($data as $rows => $row) {
         //see if this particicpant is in the participants table
@@ -685,12 +797,12 @@ function updateParticipantsDB($data, $connection)
         $conferenceTableId = mysqli_query($connection, $sqlConference);
 
         if ($conferenceTableId) {
-            $rowConference = mysqli_fetch_array($conferenceTableId);
+            $rowConference = mysqli_fetch_array($conferenceTableId, MYSQLI_ASSOC);
             $conferenceId = $rowConference['id'];
         }
-
+		
         //if this participant isn't in the participants table, insert it
-        if ($findParticipant->num_rows == 0) {
+        if (mysqli_num_rows($findParticipant) == 0) {
             $sqlInsert = "INSERT INTO participants
             (`participantName`,
             `participantPreview`,
@@ -699,6 +811,7 @@ function updateParticipantsDB($data, $connection)
             `videoRxMuted`,
             `audioTxMuted`,
             `videoTxMuted`,
+			`focusType`,
             `participantProtocol`,
             `participantType`,
             `conferenceTableId`,
@@ -713,7 +826,8 @@ function updateParticipantsDB($data, $connection)
             '".($row['videoRxMuted']?1:0)."',
             '".($row['audioTxMuted']?1:0)."',
             '".($row['videoTxMuted']?1:0)."',
-            '".mysqli_real_escape_string($connection, $row['participantProtocol'])."',
+            '".mysqli_real_escape_string($connection, $row['focusType'])."',
+			'".mysqli_real_escape_string($connection, $row['participantProtocol'])."',
             '".mysqli_real_escape_string($connection, $row['participantType'])."',
             '".mysqli_real_escape_string($connection, $conferenceId)."',
             '".mysqli_real_escape_string($connection, $row['cpLayout'])."',
@@ -721,6 +835,7 @@ function updateParticipantsDB($data, $connection)
             '".($row['packetLossWarning']?1:0)."',
             '".($row['packetLossCritical']?1:0)."')";
             $insertParticipant = mysqli_query($connection, $sqlInsert);
+			
         } else {
             $sql = "UPDATE participants SET
             `participantPreview` = '".mysqli_real_escape_string($connection, $row['participantPreview'])."',
@@ -729,6 +844,8 @@ function updateParticipantsDB($data, $connection)
             `videoRxMuted` = ".($row['videoRxMuted']?1:0).",
             `audioTxMuted` = ".($row['audioTxMuted']?1:0).",
             `videoTxMuted` = ".($row['videoTxMuted']?1:0).",
+			`focusType` = '".mysqli_real_escape_string($connection, $row['focusType'])."',
+			`focusParticipant` = '".mysqli_real_escape_string($connection, $row['focusParticipant'])."',
             `participantProtocol` = '".mysqli_real_escape_string($connection, $row['participantProtocol'])."',
             `participantType` = '".mysqli_real_escape_string($connection, $row['participantType'])."',
             `conferenceTableId` = ".mysqli_real_escape_string($connection, $conferenceId).",
@@ -738,6 +855,7 @@ function updateParticipantsDB($data, $connection)
             `packetLossCritical` = ".($row['packetLossCritical']?1:0)."
             WHERE `participantName` = ".mysqli_real_escape_string($connection, $row['participantName']);
             $updateParticipant = mysqli_query($connection, $sql);
+			
         }
 
         $existingParticipants .=  mysqli_real_escape_string($connection, $row['participantName']).",";
@@ -769,7 +887,7 @@ function updateParticipantsDB($data, $connection)
         foreach ($findPane as $paneRow) {
 
             $sqlConferenceId = "SELECT conferenceName FROM conferences WHERE id ='".$paneRow['conferenceTableId']."'";
-            $conferenceResult = mysqli_fetch_assoc(mysqli_query($connection, $sqlConferenceId));
+            $conferenceResult = mysqli_fetch_array(mysqli_query($connection, $sqlConferenceId), MYSQLI_ASSOC);
 
             $conferenceName = $conferenceResult['conferenceName'];
             $paneNumber = intval($paneRow['pane']);
@@ -808,10 +926,9 @@ function updatePanesDB($data, $connection)
     $mysqlquery = null;
     //Loop thorugh each conference in the conferences table
     foreach ($data as $conferences => $conferenceDetail) {
-        $conferenceIdSQL = "SELECT id FROM conferences WHERE conferenceId = '".$conferenceDetail['uniqueId']."'";
-        $conferenceIdQuery = mysqli_query($connection, $conferenceIdSQL);
-        $conferenceTableId = mysqli_fetch_assoc($conferenceIdQuery);
-        $conferenceTableId = $conferenceTableId['id'];
+        $sql = "SELECT id FROM conferences WHERE conferenceId = '".$conferenceDetail['uniqueId']."'";
+        $conference = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
+        $conferenceTableId = $conference['id'];
 
         $numberOfPanes = count($conferenceDetail['panes']);
         $sql = "DELETE FROM panes WHERE conferenceTableId='" . $conferenceTableId . "' AND pane >'" . $numberOfPanes . "'";
@@ -847,12 +964,16 @@ function findCurrentPane($data, $connection)
     WHERE participantName='".$data['participantName']."'
     AND conferences.conferenceName='".$data['conferenceName']."'";
 
+
+	//error_log("findCurrentPane SQL: " . $sql);
     $mysqlquery = mysqli_query($connection, $sql);
+	
+	//error_log("findCurrentPane Count: " . mysqli_num_rows($mysqlquery));
 
     if ($mysqlquery) {
 
-        $result = mysqli_fetch_array($mysqlquery);
-
+        $result = mysqli_fetch_array($mysqlquery, MYSQLI_ASSOC);
+		
     } else {
 
         $result = array('alert' => '');
@@ -901,13 +1022,16 @@ function updateSettings($data, $connection)
         $sql = "UPDATE settings SET value='".mysqli_real_escape_string($connection, $setting['value'])."'
         WHERE name='".mysqli_real_escape_string($connection, $setting['name'])."'";
         $mysqlquery = mysqli_query($connection, $sql);
+		
+		//error_log("settingupdate SQL: " . $sql);
+		
         if (!$mysqlquery) {
             $result = array('alert' => 'Could not updateSettings: '.mysqli_error($connection));
         } else {
             $result = true;
         }
     }
-    return($result);
+    return(true);
 }
 
 //takes a conference name and returns all information in the row about that conference
@@ -917,8 +1041,7 @@ function conferenceInfo($data, $connection)
     $sql = "SELECT * FROM conferences
         WHERE conferenceName='" . $data . "'";
 
-    $conference = mysqli_fetch_array(mysqli_query($connection, $sql));
-
+    $conference = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
     return($conference);
 
 }
@@ -930,7 +1053,7 @@ function participantInfo($data, $connection)
     $sql = "SELECT * FROM participants
         WHERE participantName = '" . $data['participantName'] . "'";
 
-    $participant = mysqli_fetch_array(mysqli_query($connection, $sql));
+    $participant = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
 
     return($participant);
 
@@ -943,7 +1066,7 @@ function findConferenceLoop($data, $connection)
     $sql = "SELECT * FROM participants
         WHERE displayname = '_' and conferenceTableId='" . $data['conferenceTableId'] . "'";
 
-    $loop = mysqli_fetch_array(mysqli_query($connection, $sql));
+    $loop = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
 
     return($loop);
 
@@ -952,16 +1075,16 @@ function findConferenceLoop($data, $connection)
 //finds all participants
 function allParticipants($data, $connection)
 {
-    $selectParticipantsSql = "SELECT * FROM participants INNER JOIN conferences ON participants.conferenceTableId = conferences.id";
-    $participantEnumerate = mysqli_fetch_all(mysqli_query($connection, $selectParticipantsSql), MYSQLI_ASSOC);
+    $sql = "SELECT * FROM participants INNER JOIN conferences ON participants.conferenceTableId = conferences.id";
+    $participantEnumerate = mysqli_fetch_all(mysqli_query($connection, $sql), MYSQLI_ASSOC);
 
     return($participantEnumerate);
 }
 
 function allConferences($data, $connection)
 {
-    $allConferencesSQL = "SELECT * FROM conferences";
-    $allConferencesQuery = mysqli_fetch_all(mysqli_query($connection, $allConferencesSQL), MYSQLI_ASSOC);
+    $sql = "SELECT * FROM conferences ORDER BY conferenceName";
+    $allConferencesQuery = mysqli_fetch_all(mysqli_query($connection, $sql), MYSQLI_ASSOC);
 
     return($allConferencesQuery);
 }
@@ -976,21 +1099,88 @@ function codecInfo($conferenceName, $connection)
         WHERE displayName = '__'
         AND conferenceTableId = '" . $conferenceTableId . "'";
 
-    $codec = mysqli_fetch_array(mysqli_query($connection, $sql));
+    $codec = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
 
     return($codec);
 
 }
 
+//Updates conferences with new autoExpand setting
+function updateConferenceAutoExpand($data, $connection)
+{
+    foreach ($data as $conference) {
+        $sql = "UPDATE conferences SET autoExpand = " . $conference['value'] . " WHERE conferenceName = '" . $conference['name'] . "'";
+        $mysqlquery = mysqli_query($connection, $sql);
+        
+		//error_log("updateConferenceAutoExpand SQL: " . $sql);
+		
+		if (!$mysqlquery) {
+            $result = array('alert' => 'Could not updateSettings: '.mysqli_error($connection));
+        } else {
+            $result = true;
+        }
+    }
+    return($result);
+}
+
+//Updates conferences with new autoExpand setting
+function readConferenceAutoExpand($data, $connection)
+{
+	$count = 0;
+	
+	$sql = "Select * FROM conferences WHERE autoExpand=1";
+	$response = mysqli_query($connection, $sql);
+	$count = mysqli_num_rows($response);
+	
+	//error_log("response SQL: " . json_encode(mysqli_fetch_all($response,MYSQLI_ASSOC)));
+	//error_log("count SQL: " . $count);
+	
+	if ($count > 0) {
+		$results = mysqli_fetch_all($response,MYSQLI_ASSOC);
+	} else {
+		$results = 0;
+	}
+
+    return($results);
+}
+
+//Write a layout change to DB
+function updateConferenceLayout($data, $connection)
+{
+    $sql = "UPDATE conferences SET layout = " . $data['layout'] . " WHERE conferenceName = '" . $data['conferenceName'] . "'";
+    $mysqlquery = mysqli_query($connection, $sql);
+        
+	//error_log("updateConferenceAutoExpand SQL: " . $sql);
+		
+	if (!$mysqlquery) {
+		$result = array('alert' => 'Could not updateSettings: '.mysqli_error($connection));
+	} else {
+		$result = true;
+	}
+
+    return($result);
+}
+
+//Find out how many participants are in a conference
+function conferenceCount($data, $connection)
+{
+	$sql = "Select * FROM participants WHERE conferenceTableId=" . $data;
+	$response = mysqli_query($connection, $sql);
+	$count = mysqli_num_rows($response);
+
+    return($count);
+}
+
+
 //reads the requested setting from the intSetting table
 function readIntSetting($data, $connection)
 {
-
+	
     $sql = "SELECT value FROM intSettings
         WHERE name = '" . $data['name'] . "'";
-
-    $result = mysqli_fetch_array(mysqli_query($connection, $sql));
-
+	
+	$result = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
+	
     return($result['value']);
 
 }
@@ -1011,7 +1201,7 @@ function writeIntSetting($data, $connection)
 //This function will handle all pane and participant moves, adds, and updates. This replaces the paneUpdate function.
 function participantUpdate($data, $connection)
 {
-
+	//error_log(json_encode($data));
     //accepts the following variables to allow for operations
     if (array_key_exists('conferenceTableId', $data)) {
         $conferenceTableId = $data['conferenceTableId'];
@@ -1056,29 +1246,29 @@ function participantUpdate($data, $connection)
     if ($data['action'] === "moveParticipant") {
 
         //When a participant is moved, reflect the change in the DB right away so we don't have to wait for an enumerate
-        $sql = "UPDATE participants SET conferenceTableId ='" . $conferenceTableId . "' WHERE id = '" . $participantTableId . "'";
+        $sql = "UPDATE participants SET conferenceTableId ='" . $conferenceTableId . "' WHERE id='" . $participantTableId . "'";
 
         $result = mysqli_query($connection, $sql);
 
     } elseif ($data['action'] === "muteParticipant") {
 
         //When a participant is moved, reflect the change in the DB right away so we don't have to wait for an enumerate
-        $sql = "UPDATE participants SET " . $muteChannel . " =" . $muteAction . " WHERE id = '" . $participantTableId . "'";
+        $sql = "UPDATE participants SET " . $muteChannel . " =" . $muteAction . " WHERE id='" . $participantTableId . "'";
 
         $result = mysqli_query($connection, $sql);
 
     } elseif ($data['action'] === "importantParticipant") {
         //set all important db participants to 0 then we will update the new important participant
-        $unsetImportantSQL = "UPDATE participants SET important=0 WHERE conferenceTableId = '" . $conferenceTableId . "'";
+        $unsetImportantSQL = "UPDATE participants SET important=0 WHERE conferenceTableId='" . $conferenceTableId . "'";
         $resultUnset = mysqli_query($connection, $unsetImportantSQL);
-                
+		                
         //When a participant is moved, reflect the change in the DB right away so we don't have to wait for an enumerate
-        $setImportantSQL = "UPDATE participants SET important=" . $importantValue . " WHERE id = '" . $participantTableId . "'";
+        $setImportantSQL = "UPDATE participants SET important=" . $importantValue . " WHERE id='" . $participantTableId . "'";
         $result = mysqli_query($connection, $setImportantSQL);
-
+		
     } elseif ($data['action'] === "drop") {
         //When a participant is moved, reflect the change in the DB right away so we don't have to wait for an enumerate
-        $dropSQL = "DELETE FROM participants WHERE id = '" . $participantTableId . "'";
+        $dropSQL = "DELETE FROM participants WHERE id='" . $participantTableId . "'";
         $result = mysqli_query($connection, $dropSQL);
 
     }
@@ -1142,7 +1332,7 @@ function panePlacementUpdate($data, $connection)
         $paneResultCount = mysqli_num_rows($paneResult);
 
         if ($paneResultCount == 1) {
-            $paneResultArray = mysqli_fetch_array($paneResult);
+            $paneResultArray = mysqli_fetch_array($paneResult, MYSQLI_ASSOC);
             $result = intval($paneResultArray['pane']);
         } else {
             $result = 0;
@@ -1249,7 +1439,7 @@ function panePlacementUpdate($data, $connection)
             //If the pane is NOT assigned to a participant then insert a new record
             $sql = "INSERT INTO panePlacement (`pane`, `conferenceTableId`, `participantTableId`) VALUES ('" . $data['pane'] . "','" . $data['conferenceTableId'] . "','" . $data['participantTableId'] . "')";
         } else {
-            $overwritePaneId = mysqli_fetch_array($overwritePaneResults);
+            $overwritePaneId = mysqli_fetch_all($overwritePaneResults, MYSQLI_ASSOC);
 
             //If an entry is found, then update it
             $sql = "UPDATE panePlacement SET participantTableId = '" . $data['participantTableId'] . "', loopParticipantId = NULL WHERE id = '" . $overwritePaneId['id'] . "'";
@@ -1283,16 +1473,16 @@ function conferenceSavedLayout($data, $connection)
 
     if ($data['action'] === "get") {
         //Record the current layout of the conference before changing it to a custom view
-        $conferenceSavedLayoutSQL = "SELECT * FROM conferences WHERE conferenceId = '" . $conferenceDetail['id'] . "'";
-        $conferenceSavedLayout = mysqli_fetch_array(mysqli_query($connection, $conferenceSavedLayoutSQL));
+        $sql = "SELECT * FROM conferences WHERE conferenceId = '" . $conferenceDetail['id'] . "'";
+        $conferenceSavedLayout = mysqli_fetch_all(mysqli_query($connection, $sql), MYSQLI_ASSOC);
 
         $result = intval($conferenceSavedLayout['savedLayout']);
 
     } elseif ($data['action'] === "save") {
 
         //Retrieve the saved conference layout to reset the conference to the previously known layout
-        $conferenceSavedLayoutSQL = "UPDATE conferences SET savedLayout = '" . $conferenceDetail['layout'] . "' WHERE conferenceId = '" . $conferenceDetail['id'] . "'";
-        $conferenceSavedLayoutQuery = mysqli_query($connection, $conferenceSavedLayoutSQL);
+        $sql = "UPDATE conferences SET savedLayout = '" . $conferenceDetail['layout'] . "' WHERE conferenceId = '" . $conferenceDetail['id'] . "'";
+        $conferenceSavedLayoutQuery = mysqli_query($connection, $sql);
 
         $result = true;
     }
@@ -1317,10 +1507,10 @@ function savedPane($data, $connection)
 
     if ($data['action'] === "get") {
         //Record the current layout of the conference before changing it to a custom view
-        $savedPaneSQL = "SELECT panePlacement.savedPane FROM panePlacement
+        $sql = "SELECT panePlacement.savedPane FROM panePlacement
             WHERE participantTableId='" . $participantTableId . "'
             AND conferenceTableId='" . $conferenceTableId . "'";
-        $savedPane = mysqli_fetch_array(mysqli_query($connection, $savedPaneSQL));
+        $savedPane = mysqli_fetch_all(mysqli_query($connection, $sql), MYSQLI_ASSOC);
         $result = intval($savedPane['savedPane']);
 
     } elseif ($data['action'] === "save") {

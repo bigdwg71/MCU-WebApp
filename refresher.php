@@ -2076,6 +2076,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 	//Set variables for SQL queries in following actions
 	$conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
     $conferenceTableId = $conferenceInfo['id'];
+	//error_log(json_encode($conferenceInfo));
     $findPaticipant['participantName'] = $participantName;
     $participantInfo = databaseQuery('participantInfo', $findPaticipant);
     $participantTableId = $participantInfo['id'];
@@ -2085,6 +2086,56 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
     $importantParticipant['conferenceTableId'] = $conferenceTableId;
     $importantParticipant['importantValue'] = $importantBool;
     $importantParticipantResult = databaseQuery('participantUpdate', $importantParticipant);
+	
+	echo json_encode(array('alert' => ''));
+	
+} elseif (isset($_POST['action']) && $_POST['action'] == 'markFullscreen') {
+
+	$fullscreenBool = filter_var($_POST['fullscreenBool'], FILTER_VALIDATE_BOOLEAN);
+    $conferenceName = $_POST['conferenceName'];
+	$participantName = $_POST['participantName'];
+	$participantProtocol = $_POST['participantProtocol'];
+	$participantType = $_POST['participantType'];
+	$codec = databaseQuery('codecInfo', $conferenceName);
+	
+	if ($fullscreenBool == true) {
+		$cpLayout = "layout1";
+		//Set the layout for the participant
+		$setCodecLayout = mcuCommand(
+			array('prefix' => 'participant.'),
+			'modify',
+			array('authenticationUser' => $mcuUsername,
+				'authenticationPassword' => $mcuPassword,
+				'conferenceName' => $conferenceName,
+				'participantName' => $codec['participantName'],
+				'participantProtocol' => $codec['participantProtocol'],
+				'participantType' => $codec['participantType'],
+				'operationScope' => 'activeState',
+				'cpLayout' => $cpLayout,
+				'focusType' => 'participant',
+				'focusParticipant' =>
+				array('participantName' => $participantName,
+					'participantProtocol' => $participantProtocol,
+					'participantType' => $participantType)
+			)
+		);
+	} else {
+		$cpLayout = "conferenceCustom";
+		//Set the layout for the participant
+		$setCodecLayout = mcuCommand(
+			array('prefix' => 'participant.'),
+			'modify',
+			array('authenticationUser' => $mcuUsername,
+				'authenticationPassword' => $mcuPassword,
+				'conferenceName' => $conferenceName,
+				'participantName' => $codec['participantName'],
+				'participantProtocol' => $codec['participantProtocol'],
+				'participantType' => $codec['participantType'],
+				'operationScope' => 'activeState',
+				'cpLayout' => $cpLayout,
+				'focusType' => 'voiceActivated')
+		);
+	}
 	
 	echo json_encode(array('alert' => ''));
 	

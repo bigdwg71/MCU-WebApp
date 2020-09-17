@@ -303,6 +303,10 @@ table, th, td {
     float: left;
 }
 
+.tableStyle tbody .recorder  {
+    background:#C5E9F7 !important;
+}
+
 .tableStyle .muteAllParticipants{
     padding-bottom: 5px;
 }
@@ -506,16 +510,20 @@ h2 {
     color: #43a942;
 }
 
-.icon-audio:hover, .icon-microphone:hover, .icon-video:hover, .icon-view-preview-telepresence:hover {
+.icon-audio:hover, .icon-microphone:hover, .icon-video:hover, .icon-view-preview-telepresence:hover, .icon-star:hover, .icon-fullscreen:hover {
     color: #3e9d3d;
 }
 
-.icon-speaker-cross, .icon-volume-cross, .icon-mute, .icon-video-cross, .icon-view-preview-telepresence-muted {
+.icon-speaker-cross, .icon-volume-cross, .icon-mute, .icon-video-cross, .icon-view-preview-telepresence-muted, .icon-star, .icon-fullscreen {
     color: #F96452;
 }
 
 .icon-speaker-cross:hover, .icon-volume-cross:hover, .icon-mute:hover, .icon-video-cross:hover, .icon-view-preview-telepresence-muted:hover {
     color: #e3423a;
+}
+
+.icon-star.importantTrue, .icon-fullscreen.fullscreenTrue{
+	color: #43a942;
 }
 
 .icon-exit-contain {
@@ -526,11 +534,11 @@ h2 {
     color: #e3423a;
 }
 
-.loop .icon-exit-contain, .codec .icon-exit-contain {
+.loop .icon-exit-contain, .codec .icon-exit-contain, .recorder .icon-exit-contain {
     color: #049fd9;
 }
 
-.loop .icon-exit-contain:hover, .codec .icon-exit-contain:hover {
+.loop .icon-exit-contain:hover, .codec .icon-exit-contain:hover, .recorder .icon-exit-contain:hover {
     color: #0393c9;
 }
 
@@ -612,3 +620,5 @@ label {
 .modal-body {
     padding: 24px 32px;
 }
+
+
