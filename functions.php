@@ -1439,7 +1439,7 @@ function panePlacementUpdate($data, $connection)
             //If the pane is NOT assigned to a participant then insert a new record
             $sql = "INSERT INTO panePlacement (`pane`, `conferenceTableId`, `participantTableId`) VALUES ('" . $data['pane'] . "','" . $data['conferenceTableId'] . "','" . $data['participantTableId'] . "')";
         } else {
-            $overwritePaneId = mysqli_fetch_all($overwritePaneResults, MYSQLI_ASSOC);
+            $overwritePaneId = mysqli_fetch_array($overwritePaneResults, MYSQLI_ASSOC);
 
             //If an entry is found, then update it
             $sql = "UPDATE panePlacement SET participantTableId = '" . $data['participantTableId'] . "', loopParticipantId = NULL WHERE id = '" . $overwritePaneId['id'] . "'";
@@ -1474,7 +1474,7 @@ function conferenceSavedLayout($data, $connection)
     if ($data['action'] === "get") {
         //Record the current layout of the conference before changing it to a custom view
         $sql = "SELECT * FROM conferences WHERE conferenceId = '" . $conferenceDetail['id'] . "'";
-        $conferenceSavedLayout = mysqli_fetch_all(mysqli_query($connection, $sql), MYSQLI_ASSOC);
+        $conferenceSavedLayout = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
 
         $result = intval($conferenceSavedLayout['savedLayout']);
 
@@ -1510,7 +1510,7 @@ function savedPane($data, $connection)
         $sql = "SELECT panePlacement.savedPane FROM panePlacement
             WHERE participantTableId='" . $participantTableId . "'
             AND conferenceTableId='" . $conferenceTableId . "'";
-        $savedPane = mysqli_fetch_all(mysqli_query($connection, $sql), MYSQLI_ASSOC);
+        $savedPane = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
         $result = intval($savedPane['savedPane']);
 
     } elseif ($data['action'] === "save") {
