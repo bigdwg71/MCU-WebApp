@@ -506,6 +506,13 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 			$conferenceCount = databaseQuery('conferenceCount', $conferenceInfo['id']);
 			$currentLayout = $conference['layout'];
 			
+			$conferenceLoop = databaseQuery('findConferenceLoop', $conferenceInfo['id']);
+
+			//If there is a loop in the conference, then we want to subtract one participant
+			if ($conferenceLoop['participantName'] != "") {
+				$conferenceCount = $conferenceCount - 1;
+			}
+			
 			//error_log("conferenceALL: " . json_encode($conference));
 			//error_log("conference: " . $conferenceName);
 			//error_log("count: " . $conferenceCount);
