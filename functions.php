@@ -143,6 +143,7 @@ function databaseConnect()
             `layout` int(31) NOT NULL,
             `savedLayout` int(11) DEFAULT NULL,
 			`autoExpand` tinyint(1) NOT NULL DEFAULT '0',
+			`autoMute` tinyint(1) NOT NULL DEFAULT '0',
             PRIMARY KEY (`id`),
             UNIQUE KEY `conferenceId` (`conferenceId`),
             UNIQUE KEY `conferenceName` (`conferenceName`))
@@ -182,8 +183,7 @@ function databaseConnect()
 
         if ($createIntSettings) {
             $sql = "INSERT INTO `intSettings` (`name`, `value`) VALUES
-                    ('showIsLive', 'false'),
-                    ('waitingRoomCount', '0');";
+                    ('showIsLive', 'false');";
             mysqli_query($connection, $sql);
         }
             $result = $connection;
@@ -243,10 +243,10 @@ function databaseQuery($action, $data)
         $result = conferenceInfo($data, $connection);
     } elseif ($action == 'codecInfo') {
         $result = codecInfo($data, $connection);
-    } elseif ($action == 'updateConferenceAutoExpand') {
-        $result = updateConferenceAutoExpand($data, $connection);
-    } elseif ($action == 'readConferenceAutoExpand') {
-        $result = readConferenceAutoExpand($data, $connection);
+    } elseif ($action == 'updateConferenceSetting') {
+        $result = updateConferenceSetting($data, $connection);
+    } elseif ($action == 'readConferenceSetting') {
+        $result = readConferenceSetting($data, $connection);
     } elseif ($action == 'conferenceCount') {
         $result = conferenceCount($data, $connection);
     } elseif ($action == 'updateConferenceLayout') {
@@ -432,9 +432,13 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
     }
 
     $i = 0;
-    $waitingRoomCount = 0;
     $waitingRoom = databaseQuery('readSetting', 'waitingRoom');
-
+	
+	//Build list of autoMute conferences
+	$querySetting['setting'] = "autoMute";
+	$autoMuteConferences = databaseQuery('readConferenceSetting', $querySetting);
+	$allParticipants = databaseQuery('allParticipants', 'NA');
+	
     if (isset($participantEnumerate['participants'])) {
         foreach ($participantEnumerate['participants'] as $entry => $participantInstance) {
             if (is_array($participantInstance)) {
@@ -481,24 +485,52 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
                 $participantArray[$i]['important'] = $participantInstance['currentState']['important'];
                 $participantArray[$i]['packetLossWarning'] = $participantInstance['currentState']['packetLossWarning'];
                 $participantArray[$i]['packetLossCritical'] = $participantInstance['currentState']['packetLossCritical'];
-                $i++;
-
-                //track the number of participants in the waiting room
-                //to set the appropriate layout of the waiting room
-                //if ($participantInstance['conferenceName'] == $waitingRoom
-                //&& $participantInstance['currentState']['displayName'] != '__') {
-                if ($participantInstance['conferenceName'] == $waitingRoom) {
-                    $waitingRoomCount++;
-                }
+                
+				//Build variables to test whether or not the user has been seen before or not.
+				$conferenceSearch = array_search($participantInstance['conferenceName'], array_column($autoMuteConferences, 'conferenceName'));
+				$participantSearch = array_search($participantInstance['participantName'], array_column($allParticipants, 'participantName'));
+				$participantCount = count($allParticipants);
+				
+				//error_log("Conference Search: " . json_encode($conferenceSearch) . " | Participant Search: " . json_encode($participantSearch) . " | Participant Count: " . json_encode($participantCount));
+				
+				if ( $conferenceSearch !== FALSE && $participantSearch === FALSE && $participantCount > 0 ) {
+					
+					//error_log("Conference Search: " . json_encode($conferenceSearch) . " | Participant Search: " . json_encode($participantSearch) . " | Participant Count: " . json_encode($participantCount));
+					//error_log("autoMute Conference Found: " . json_encode($participantInstance['conferenceName']));
+					//error_log("autoMute Participant Found: " . json_encode($participantInstance['participantName']));
+					
+					//Mute the participant in the MCU
+					$result = mcuCommand(
+						array('prefix' => 'participant.'),
+						'modify',
+						array('authenticationUser' => $mcuUsername,
+							  'authenticationPassword' => $mcuPassword,
+							  'conferenceName' => $participantInstance['conferenceName'],
+							  'participantName' => $participantInstance['participantName'],
+							  'participantProtocol' => $participantInstance['participantProtocol'],
+							  'participantType' => $participantInstance['participantType'],
+							  'operationScope' => 'activeState',
+							  'audioRxMuted' => TRUE,
+							  'videoRxMuted' => TRUE)
+					);
+					
+					//Mute the participant in the database
+					$participantArray[$i]['audioRxMuted'] = TRUE;
+					$participantArray[$i]['videoRxMuted'] = TRUE;
+				}
+				
+				$i++;
+				
             }
         }
     }
 	//handle auto-expanding conferences
-	$autoExpandConferences = databaseQuery('readConferenceAutoExpand', 'NA');
+	$querySetting['setting'] = "autoExpand";
+	$autoExpandConferences = databaseQuery('readConferenceSetting', $querySetting);
 	
 	//error_log("autoExpandConferences: " . json_encode($autoExpandConferences));
 	
-	if ($autoExpandConferences != 0) {
+	if (count($autoExpandConferences) > 0) {
 		foreach ($autoExpandConferences as $conference) {
 			
 			$conferenceName = $conference['conferenceName'];
@@ -506,8 +538,9 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 			$conferenceCount = databaseQuery('conferenceCount', $conferenceInfo['id']);
 			$currentLayout = $conference['layout'];
 			
-			$conferenceLoop = databaseQuery('findConferenceLoop', $conferenceInfo['id']);
-
+			$findLoop['conferenceTableId'] = $conferenceInfo['id'];
+			$conferenceLoop = databaseQuery('findConferenceLoop', $findLoop);
+			
 			//If there is a loop in the conference, then we want to subtract one participant
 			if ($conferenceLoop['participantName'] != "") {
 				$conferenceCount = $conferenceCount - 1;
@@ -558,52 +591,7 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 		}
 	}
 	
-	/*
-    //Get current waitingRoomCount from DB
-    $queryRead['name'] = 'waitingRoomCount';
-    $dbWaitingRoomCount = filter_var(databaseQuery('readIntSetting', $queryRead), FILTER_VALIDATE_INT);
-
-    if ($waitingRoomCount != $dbWaitingRoomCount) {
-
-        //write waitingRoomCount to DB for retrival later
-        $queryWrite['name'] = 'waitingRoomCount';
-        $queryWrite['value'] = $waitingRoomCount;
-        $result = databaseQuery('writeIntSetting', $queryWrite);
-
-        //since they don't match, now we need to determine if we should change the layout
-        if ($waitingRoomCount >= 0 && $waitingRoomCount <= 2) {
-            $newWaitingRoomLayout = 1;
-        } elseif ($waitingRoomCount >= 3 && $waitingRoomCount <= 5) {
-            $newWaitingRoomLayout = 2;
-        } elseif ($waitingRoomCount == 6 || $waitingRoomCount == 7) {
-            $newWaitingRoomLayout = 8;
-        } elseif ($waitingRoomCount == 8 || $waitingRoomCount == 9) {
-            $newWaitingRoomLayout = 53;
-        } elseif ($waitingRoomCount == 10) {
-            $newWaitingRoomLayout = 3;
-        } elseif ($waitingRoomCount >= 11 && $waitingRoomCount <= 13) {
-            $newWaitingRoomLayout = 9;
-        } elseif ($waitingRoomCount >= 14 && $waitingRoomCount <= 17) {
-            $newWaitingRoomLayout = 4;
-        } elseif ($waitingRoomCount >= 18) {
-            $newWaitingRoomLayout = 43;
-        }
-
-        $result = mcuCommand(
-            array('prefix' => 'conference.'),
-            'modify',
-            array('authenticationUser' => $mcuUsername,
-                  'authenticationPassword' => $mcuPassword,
-                  'conferenceName' => $waitingRoom,
-                  'customLayoutEnabled' => true,
-                  'customLayout' => $newWaitingRoomLayout,
-                  'newParticipantsCustomLayout' => true,
-                  'setAllParticipantsToCustomLayout' => true)
-        );
-    }
-	*/
-	
-    //Write participant info to database
+	//Write participant info to database
     databaseQuery('updateParticipantsDB', $participantArray);
     echo json_encode(array('alert' => ''));
     return($participantArray);
@@ -1026,6 +1014,9 @@ function readSetting($data, $connection)
 function updateSettings($data, $connection)
 {
     foreach ($data as $setting) {
+		
+		//error_log("Setting Value: " . json_encode($setting['value']));
+		
         $sql = "UPDATE settings SET value='".mysqli_real_escape_string($connection, $setting['value'])."'
         WHERE name='".mysqli_real_escape_string($connection, $setting['name'])."'";
         $mysqlquery = mysqli_query($connection, $sql);
@@ -1113,13 +1104,13 @@ function codecInfo($conferenceName, $connection)
 }
 
 //Updates conferences with new autoExpand setting
-function updateConferenceAutoExpand($data, $connection)
+function updateConferenceSetting($data, $connection)
 {
     foreach ($data as $conference) {
-        $sql = "UPDATE conferences SET autoExpand = " . $conference['value'] . " WHERE conferenceName = '" . $conference['name'] . "'";
+        $sql = "UPDATE conferences SET " . $conference['setting'] . " = " . $conference['value'] . " WHERE conferenceName = '" . $conference['name'] . "'";
         $mysqlquery = mysqli_query($connection, $sql);
         
-		//error_log("updateConferenceAutoExpand SQL: " . $sql);
+		//error_log("updateConferenceSetting SQL: " . $sql);
 		
 		if (!$mysqlquery) {
             $result = array('alert' => 'Could not updateSettings: '.mysqli_error($connection));
@@ -1131,11 +1122,11 @@ function updateConferenceAutoExpand($data, $connection)
 }
 
 //Updates conferences with new autoExpand setting
-function readConferenceAutoExpand($data, $connection)
+function readConferenceSetting($data, $connection)
 {
 	$count = 0;
 	
-	$sql = "Select * FROM conferences WHERE autoExpand=1";
+	$sql = "Select * FROM conferences WHERE " . $data['setting'] . "=1";
 	$response = mysqli_query($connection, $sql);
 	$count = mysqli_num_rows($response);
 	
@@ -1157,7 +1148,7 @@ function updateConferenceLayout($data, $connection)
     $sql = "UPDATE conferences SET layout = " . $data['layout'] . " WHERE conferenceName = '" . $data['conferenceName'] . "'";
     $mysqlquery = mysqli_query($connection, $sql);
         
-	//error_log("updateConferenceAutoExpand SQL: " . $sql);
+	//error_log("updateConferenceSetting SQL: " . $sql);
 		
 	if (!$mysqlquery) {
 		$result = array('alert' => 'Could not updateSettings: '.mysqli_error($connection));
