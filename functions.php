@@ -439,9 +439,18 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 	$autoMuteConferences = databaseQuery('readConferenceSetting', $querySetting);
 	$allParticipants = databaseQuery('allParticipants', 'NA');
 	
+	$participantConferenceCount = array();
+	
     if (isset($participantEnumerate['participants'])) {
         foreach ($participantEnumerate['participants'] as $entry => $participantInstance) {
             if (is_array($participantInstance)) {
+				
+				if (!isset($participantConferenceCount[$participantInstance['conferenceName']])) {
+					$participantConferenceCount[$participantInstance['conferenceName']] = array();
+				}
+				
+				$participantConferenceCount[$participantInstance['conferenceName']] = intval($participantConferenceCount[$participantInstance['conferenceName']]) + 1;
+
                 $participantArray[$i]['participantName'] = $participantInstance['participantName'];
 
                 $data['participantName'] = $participantInstance['participantName'];
@@ -464,9 +473,6 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 				$participantArray[$i]['focusType'] = $participantInstance['currentState']['focusType'];
 				
 				if ($participantInstance['currentState']['focusType'] == "participant") {
-					//error_log("participantInstance: " . json_encode($participantInstance));
-					//error_log("focusType: " . $participantArray[$i]['focusType']);
-					//error_log("focusParticipant: " . $participantInstance['currentState']['focusParticipant']['participantName']);
 					$participantArray[$i]['focusParticipant'] = $participantInstance['currentState']['focusParticipant']['participantName'];
 				} else {
 					$participantArray[$i]['focusParticipant'] = 0;
@@ -494,10 +500,6 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 				//error_log("Conference Search: " . json_encode($conferenceSearch) . " | Participant Search: " . json_encode($participantSearch) . " | Participant Count: " . json_encode($participantCount));
 				
 				if ( $conferenceSearch !== FALSE && $participantSearch === FALSE && $participantCount > 0 ) {
-					
-					//error_log("Conference Search: " . json_encode($conferenceSearch) . " | Participant Search: " . json_encode($participantSearch) . " | Participant Count: " . json_encode($participantCount));
-					//error_log("autoMute Conference Found: " . json_encode($participantInstance['conferenceName']));
-					//error_log("autoMute Participant Found: " . json_encode($participantInstance['participantName']));
 					
 					//Mute the participant in the MCU
 					$result = mcuCommand(
@@ -538,58 +540,66 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 			$conferenceCount = databaseQuery('conferenceCount', $conferenceInfo['id']);
 			$currentLayout = $conference['layout'];
 			
-			$findLoop['conferenceTableId'] = $conferenceInfo['id'];
-			$conferenceLoop = databaseQuery('findConferenceLoop', $findLoop);
+			$oldParticipantCount = apc_fetch('oldParticipantCount',$success);
 			
-			//If there is a loop in the conference, then we want to subtract one participant
-			if ($conferenceLoop['participantName'] != "") {
-				$conferenceCount = $conferenceCount - 1;
-			}
+			//error_log("conference Name: " . $conferenceName);
+			//error_log("Conference Old Count: " . $oldParticipantCount[$conferenceName]);
+			//error_log("conference Current Count: " . $participantConferenceCount[$conferenceName]);
 			
-			//error_log("conferenceALL: " . json_encode($conference));
-			//error_log("conference: " . $conferenceName);
-			//error_log("count: " . $conferenceCount);
-			//error_log("layout: " . $currentLayout);
-			
-			if ($conferenceCount >= 0 && $conferenceCount <= 2) {
-				$newConferenceLayout = 1;
-			} elseif ($conferenceCount >= 3 && $conferenceCount <= 5) {
-				$newConferenceLayout = 2;
-			} elseif ($conferenceCount == 6 || $conferenceCount == 7) {
-				$newConferenceLayout = 8;
-			} elseif ($conferenceCount == 8 || $conferenceCount == 9) {
-				$newConferenceLayout = 53;
-			} elseif ($conferenceCount == 10) {
-				$newConferenceLayout = 3;
-			} elseif ($conferenceCount >= 11 && $conferenceCount <= 13) {
-				$newConferenceLayout = 9;
-			} elseif ($conferenceCount >= 14 && $conferenceCount <= 17) {
-				$newConferenceLayout = 4;
-			} elseif ($conferenceCount >= 18) {
-				$newConferenceLayout = 43;
-			}
-			
-			//error_log("new layout: " . $newConferenceLayout);
-			
-			if ($currentLayout != $newConferenceLayout) {
-				$result = mcuCommand(
-					array('prefix' => 'conference.'),
-					'modify',
-					array('authenticationUser' => $mcuUsername,
-						  'authenticationPassword' => $mcuPassword,
-						  'conferenceName' => $conferenceName,
-						  'customLayoutEnabled' => true,
-						  'customLayout' => $newConferenceLayout,
-						  'newParticipantsCustomLayout' => true,
-						  'setAllParticipantsToCustomLayout' => true)
-				);
+			if (intval($oldParticipantCount[$conferenceName]) !== intval($participantConferenceCount[$conferenceName]) && $success === TRUE) {
 				
-				$conferenceInfo['layout'] = $newConferenceLayout;
+				error_log("conference Name: " . $conferenceName);
+				error_log("Conference Old Count: " . $oldParticipantCount[$conferenceName]);
+				error_log("conference Current Count: " . $participantConferenceCount[$conferenceName]);
 				
-				$changeLayout = databaseQuery('updateConferenceLayout', $conferenceInfo);
+				$findLoop['conferenceTableId'] = $conferenceInfo['id'];
+				$conferenceLoop = databaseQuery('findConferenceLoop', $findLoop);
+				
+				//If there is a loop in the conference, then we want to subtract one participant
+				if ($conferenceLoop['participantName'] != "") {
+					$conferenceCount = $conferenceCount - 1;
+				}
+				
+				if ($conferenceCount >= 0 && $conferenceCount <= 2) {
+					$newConferenceLayout = 1;
+				} elseif ($conferenceCount >= 3 && $conferenceCount <= 5) {
+					$newConferenceLayout = 2;
+				} elseif ($conferenceCount == 6 || $conferenceCount == 7) {
+					$newConferenceLayout = 8;
+				} elseif ($conferenceCount == 8 || $conferenceCount == 9) {
+					$newConferenceLayout = 53;
+				} elseif ($conferenceCount == 10) {
+					$newConferenceLayout = 3;
+				} elseif ($conferenceCount >= 11 && $conferenceCount <= 13) {
+					$newConferenceLayout = 9;
+				} elseif ($conferenceCount >= 14 && $conferenceCount <= 17) {
+					$newConferenceLayout = 4;
+				} elseif ($conferenceCount >= 18) {
+					$newConferenceLayout = 43;
+				}
+				
+				if ($currentLayout != $newConferenceLayout) {
+					$result = mcuCommand(
+						array('prefix' => 'conference.'),
+						'modify',
+						array('authenticationUser' => $mcuUsername,
+							  'authenticationPassword' => $mcuPassword,
+							  'conferenceName' => $conferenceName,
+							  'customLayoutEnabled' => true,
+							  'customLayout' => $newConferenceLayout,
+							  'newParticipantsCustomLayout' => true,
+							  'setAllParticipantsToCustomLayout' => true)
+					);
+					
+					$conferenceInfo['layout'] = $newConferenceLayout;
+					
+					$changeLayout = databaseQuery('updateConferenceLayout', $conferenceInfo);
+				}
 			}
 		}
 	}
+	
+	apc_store('oldParticipantCount',$participantConferenceCount);
 	
 	//Write participant info to database
     databaseQuery('updateParticipantsDB', $participantArray);
@@ -625,8 +635,7 @@ function writeConferenceEnumerate($mcuUsername, $mcuPassword)
         unset($conferenceEnumerate['enumerateID']);
         unset($conferenceEnumerate['currentRevision']);
         $conferenceEnumerate = array_merge_recursive($conferenceEnumerate, $conferenceEnumerateAdd);
-		
-		
+
     }
 
     if (isset($conferenceEnumerate['conferences'])) {
@@ -763,8 +772,6 @@ function updateConferencesDB($data, $connection)
         $sql = "DELETE FROM conferences WHERE conferenceId NOT IN (".$existingConferences.")";
     }
 
-	
-
     $mysqlquery = mysqli_query($connection, $sql);
     return($result);
 }
@@ -776,8 +783,6 @@ function updateParticipantsDB($data, $connection)
     $updateParticipant = "";
     $conferenceTableId = "";
     $insertParticipant = "EMPTY";
-	
-	
 
     foreach ($data as $rows => $row) {
         //see if this particicpant is in the participants table
