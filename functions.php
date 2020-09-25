@@ -541,16 +541,12 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 			$currentLayout = $conference['layout'];
 			
 			$oldParticipantCount = apc_fetch('oldParticipantCount',$success);
-			
-			//error_log("conference Name: " . $conferenceName);
-			//error_log("Conference Old Count: " . $oldParticipantCount[$conferenceName]);
-			//error_log("conference Current Count: " . $participantConferenceCount[$conferenceName]);
-			
+					
 			if (intval($oldParticipantCount[$conferenceName]) !== intval($participantConferenceCount[$conferenceName]) && $success === TRUE) {
 				
-				error_log("conference Name: " . $conferenceName);
-				error_log("Conference Old Count: " . $oldParticipantCount[$conferenceName]);
-				error_log("conference Current Count: " . $participantConferenceCount[$conferenceName]);
+				//error_log("conference Name: " . $conferenceName);
+				//error_log("Conference Old Count: " . $oldParticipantCount[$conferenceName]);
+				//error_log("conference Current Count: " . $participantConferenceCount[$conferenceName]);
 				
 				$findLoop['conferenceTableId'] = $conferenceInfo['id'];
 				$conferenceLoop = databaseQuery('findConferenceLoop', $findLoop);
