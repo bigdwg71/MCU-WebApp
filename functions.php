@@ -441,9 +441,13 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 	
 	$participantConferenceCount = array();
 	
+	
+	
     if (isset($participantEnumerate['participants'])) {
         foreach ($participantEnumerate['participants'] as $entry => $participantInstance) {
             if (is_array($participantInstance)) {
+				
+				//error_log(json_encode($participantInstance));
 				
 				if (!isset($participantConferenceCount[$participantInstance['conferenceName']])) {
 					$participantConferenceCount[$participantInstance['conferenceName']] = array();
@@ -472,7 +476,22 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
                 $participantArray[$i]['videoTxMuted'] = $participantInstance['currentState']['videoTxMuted'];
 				$participantArray[$i]['focusType'] = $participantInstance['currentState']['focusType'];
 				
-				if ($participantInstance['currentState']['focusType'] == "participant") {
+				/*
+				if ($participantInstance['currentState']['displayName'] == '__') {
+					
+					error_log("Conference Name: " . $participantInstance['conferenceName']);
+					error_log("Focus Type: " . $participantInstance['currentState']['focusType']);
+					
+					if ($participantInstance['currentState']['focusType'] == "participant") {
+						error_log("Layout Source: " . $participantInstance['currentState']['layoutSource']);
+					}					
+				}
+				*/
+				
+				if ($participantInstance['currentState']['focusType'] == "participant" && $participantInstance['currentState']['layoutSource'] == "conferenceCustom") {
+					$participantArray[$i]['focusType'] = "voiceActivated";
+					$participantArray[$i]['focusParticipant'] = 0;
+				} elseif ($participantInstance['currentState']['focusType'] == "participant") {
 					$participantArray[$i]['focusParticipant'] = $participantInstance['currentState']['focusParticipant']['participantName'];
 				} else {
 					$participantArray[$i]['focusParticipant'] = 0;
@@ -537,7 +556,7 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 			
 			$conferenceName = $conference['conferenceName'];
 			$conferenceInfo = databaseQuery('conferenceInfo', $conferenceName);
-			$conferenceCount = databaseQuery('conferenceCount', $conferenceInfo['id']);
+			//$conferenceCount = databaseQuery('conferenceCount', $conferenceInfo['id']);
 			$currentLayout = $conference['layout'];
 			
 			$oldParticipantCount = apc_fetch('oldParticipantCount',$success);
@@ -550,11 +569,17 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 				
 				$findLoop['conferenceTableId'] = $conferenceInfo['id'];
 				$conferenceLoop = databaseQuery('findConferenceLoop', $findLoop);
+				$conferenceCount = $participantConferenceCount[$conferenceName];
+				
+				//error_log("conference loop: " . json_encode($conferenceLoop));
 				
 				//If there is a loop in the conference, then we want to subtract one participant
-				if ($conferenceLoop['participantName'] != "") {
+				if (isset($conferenceLoop['participantName'])) {
+					//error_log("Loop Found!");
 					$conferenceCount = $conferenceCount - 1;
 				}
+				
+				//error_log("conference count: " . $conferenceCount);
 				
 				if ($conferenceCount >= 0 && $conferenceCount <= 2) {
 					$newConferenceLayout = 1;
@@ -652,9 +677,9 @@ function writeConferenceEnumerate($mcuUsername, $mcuPassword)
 }
 
 //This function reads panePlacement data from the MCU and writes it to the database
-function writePanesDB($mcuUsername, $mcuPassword)
+function writePanesDB($mcuUsername, $mcuPassword, $conferenceArray)
 {
-
+	/*
     $conferenceArray = [];
     $allConferences = databaseQuery('allConferences', 'NA');
 
@@ -664,19 +689,30 @@ function writePanesDB($mcuUsername, $mcuPassword)
         $conferenceArray[$conferenceName]['customLayout'] = $conferenceInstance['layout'];
         $conferenceArray[$conferenceName]['uniqueId'] = $conferenceInstance['conferenceId'];
     }
-
+	*/
+	//error_log("Conference Array: " . json_encode($conferenceArray));
+	
     foreach ($conferenceArray as $conference) {
         $j = 0;
         $conferenceName = $conference['conferenceName'];
+		
+		if (count($conferenceArray) == 1) {
+			//error_log("Conference: " . json_encode($conference));
+		}
 
         $currentPanePlacement = checkPanePlacement($conferenceName, $mcuUsername, $mcuPassword);
-        foreach ($currentPanePlacement['panePlacement']['panes'] as $pane) {
+        		
+		foreach ($currentPanePlacement['panePlacement']['panes'] as $pane) {
             $conferenceArray[$conferenceName]['panes']['pane'.$j] = $pane;
             $j++;
         }
+		if (count($conferenceArray) == 1) {
+			//error_log("updatePanesDB: " . json_encode($conferenceArray[$conferenceName]));
+		}		
+		
+		$updatePanesDB = databaseQuery('updatePanesDB', $conferenceArray[$conferenceName]);			
+		
     }
-
-    $updatePanesDB = databaseQuery('updatePanesDB', $conferenceArray);
 
     return($updatePanesDB);
 }
@@ -921,17 +957,17 @@ function updatePanesDB($data, $connection)
 {
     $mysqlquery = null;
     //Loop thorugh each conference in the conferences table
-    foreach ($data as $conferences => $conferenceDetail) {
-        $sql = "SELECT id FROM conferences WHERE conferenceId = '".$conferenceDetail['uniqueId']."'";
+    //foreach ($data as $conferences => $conferenceDetail) {
+        $sql = "SELECT id FROM conferences WHERE conferenceId = '".$data['uniqueId']."'";
         $conference = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
         $conferenceTableId = $conference['id'];
 
-        $numberOfPanes = count($conferenceDetail['panes']);
+        $numberOfPanes = count($data['panes']);
         $sql = "DELETE FROM panes WHERE conferenceTableId='" . $conferenceTableId . "' AND pane >'" . $numberOfPanes . "'";
         $mysqlquery = mysqli_query($connection, $sql);
 
         //Loop through each pane of the conference
-        foreach ($conferenceDetail['panes'] as $paneNumber => $paneDetail) {
+        foreach ($data['panes'] as $paneNumber => $paneDetail) {
 
             if ($paneDetail['type'] == 'participant') {
 
@@ -948,7 +984,7 @@ function updatePanesDB($data, $connection)
             $mysqlquery = mysqli_query($connection, $paneSQL);
         }
 
-    }
+    //}
     return($mysqlquery);
 }
 

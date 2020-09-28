@@ -13,10 +13,12 @@ require_once 'functions.php';
 if (isset($_POST['action']) && $_POST['action'] == '') {
     //not sure why this is here
 } elseif (isset($_POST['action']) && $_POST['action'] == 'refreshWeb') {
+	$conferenceArray = $_POST['conferenceList'];
+	
     if ($_POST['type'] == 'first') {
         writeConferenceEnumerate($mcuUsername, $mcuPassword);
         writeParticipantEnumerate($mcuUsername, $mcuPassword);
-        writePanesDB($mcuUsername, $mcuPassword);
+        writePanesDB($mcuUsername, $mcuPassword, $conferenceArray);
     }
     refreshWeb($mcuUsername, $mcuPassword);
 } elseif (isset($_POST['action']) && $_POST['action'] == 'writeParticipantEnumerate') {
@@ -24,7 +26,8 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 } elseif (isset($_POST['action']) && $_POST['action'] == 'writeConferenceEnumerate') {
     writeConferenceEnumerate($mcuUsername, $mcuPassword);
 } elseif (isset($_POST['action']) && $_POST['action'] == 'writePanesDB') {
-    writePanesDB($mcuUsername, $mcuPassword);
+	$conferenceArray = $_POST['conferenceList'];
+    writePanesDB($mcuUsername, $mcuPassword, $conferenceArray);
 } elseif (isset($_POST['action']) && $_POST['action'] == 'transfer') {
 
     //Passes variables scrubbedParticipantList, sourceConference, sourceType, destinationConference, destType
@@ -564,6 +567,11 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                         )
             );
         }
+	
+	$conferenceArray[$conferenceName]['uniqueId'] = $conferenceInfo['conferenceId'];
+	$conferenceArray[$conferenceName]['conferenceName'] = $conferenceInfo['conferenceName'];
+	//Update the panes for this specific modified conference
+	writePanesDB($mcuUsername, $mcuPassword, $conferenceArray);
 
     echo json_encode(array('alert' => ''));
 
@@ -1165,6 +1173,12 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
         $updatePaneResult = databaseQuery('panePlacementUpdate', $updatePane);
 
     }
+	
+	$conferenceArray[$conferenceName]['uniqueId'] = $conferenceInfo['conferenceId'];
+	$conferenceArray[$conferenceName]['conferenceName'] = $conferenceInfo['conferenceName'];
+	//Update the panes for this specific modified conference
+	writePanesDB($mcuUsername, $mcuPassword, $conferenceArray);
+	
     echo json_encode(array('alert' => '' ));
 
 } elseif (isset($_POST['action']) && $_POST['action'] == 'setSpecialLayout') {

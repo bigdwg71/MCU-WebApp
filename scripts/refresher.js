@@ -45,7 +45,7 @@ function refreshWeb(refreshType) {
 	//console.log('JS refreshType: ' + refreshType);
     "use strict";
     //call refresher.php poster with "action" pressed.
-    $.customPOST({action: 'refreshWeb', type: refreshType}, function (r) {
+    $.customPOST({action: 'refreshWeb', type: refreshType, conferenceList: conferenceList}, function (r) {
 		//console.log('JS R: ' + JSON.stringify(r));
         if (r.conferenceArray && r.participantArray) {
             participantList = r.participantArray;
@@ -155,6 +155,7 @@ function refreshWeb(refreshType) {
                     isDisabled9,
                     isDisabled4,
                     isDisabled43,
+					isDisabled27,
                     modalId,
                     titlePosition,
                     time,
@@ -184,6 +185,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+					isDisabled27 = '';
                     layoutName = '1x1';
                 } else if (layoutID + 1 === 16) {
                     isDisabled1 = '';
@@ -195,6 +197,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+                    isDisabled27 = '';
                     layoutName = '1x2';
                 } else if (layoutID + 1 === 2) {
                     isDisabled1 = '';
@@ -206,6 +209,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+                    isDisabled27 = '';
                     layoutName = '2x2';
                 } else if (layoutID + 1 === 8) {
                     isDisabled8 = ' disabled';
@@ -217,6 +221,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+                    isDisabled27 = '';
                     layoutName = '3x2';
                 } else if (layoutID + 1 === 53) {
                     isDisabled53 = ' disabled';
@@ -228,6 +233,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+                    isDisabled27 = '';
                     layoutName = '4x2';
                 } else if (layoutID + 1 === 3) {
                     isDisabled3 = ' disabled';
@@ -239,6 +245,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+                    isDisabled27 = '';
                     layoutName = '3x3';
                 } else if (layoutID + 1 === 9) {
                     isDisabled9 = ' disabled';
@@ -250,6 +257,7 @@ function refreshWeb(refreshType) {
                     isDisabled2 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+                    isDisabled27 = '';
                     layoutName = '4x3';
                 } else if (layoutID + 1 === 4) {
                     isDisabled4 = ' disabled';
@@ -261,6 +269,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled2 = '';
                     isDisabled43 = '';
+                    isDisabled27 = '';
                     layoutName = '4x4';
                 } else if (layoutID + 1 === 43) {
                     isDisabled43 = ' disabled';
@@ -272,7 +281,20 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
+                    isDisabled27 = '';
                     layoutName = '5x4';
+                } else if (layoutID + 1 === 27) {
+                    isDisabled43 = '';
+                    isDisabled1 = '';
+                    isDisabled16 = '';
+                    isDisabled8 = '';
+                    isDisabled53 = '';
+                    isDisabled3 = '';
+                    isDisabled9 = '';
+                    isDisabled4 = '';
+                    isDisabled2 = '';
+                    isDisabled27 = ' disabled';
+                    layoutName = '27';
                 } else if (layoutID + 1 === 33) {
                     isDisabled43 = '';
                     isDisabled1 = '';
@@ -283,6 +305,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
+                    isDisabled27 = '';
                     layoutName = 'Important';
                     conferenceImportant = true;
                 } else if (layoutID + 1 === 23) {
@@ -295,6 +318,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
+                    isDisabled27 = '';
                     layoutName = 'Important';
                     conferenceImportant = true;
                 } else {
@@ -307,6 +331,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
+                    isDisabled27 = '';
                     layoutName = 'Custom';
                 }
                 modalId = "openModal" + conferenceArrayInnerValue.uniqueId;
@@ -335,6 +360,7 @@ function refreshWeb(refreshType) {
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="9" value="4x3"' + isDisabled9 + '><img src="css/images/layout4x3.png" alt="4x3"/></button></li>';
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="4" value="4x4"' + isDisabled4 + '><img src="css/images/layout4x4.png" alt="4x4"/></button></li>';
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="27" value="27"' + isDisabled27 + '><img src="css/images/layout27.png" alt="27"/></button></li>';
                 content[0] += '</ul>';
                 content[0] += '<form id="panePlacement' + conferenceArrayInnerValue.uniqueId + '">';
 
@@ -935,7 +961,7 @@ function writePanesDB() {
     $.ajax({
         type: "POST",
         url: "refresher.php",
-        data: {action: "writePanesDB"},
+        data: {action: "writePanesDB", conferenceList: conferenceList},
         dataType: "json",
         cache: false,
 
