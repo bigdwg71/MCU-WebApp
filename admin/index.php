@@ -10,7 +10,7 @@ if (isset($_POST['submit'])) {
 
 	foreach ($_POST as $name => $value) {
 		
-		if ($name != 'submit' && $name != 'autoExpandConference' && $name != 'autoMuteConference') {
+		if ($name != 'submit' && $name != 'autoExpandConference' && $name != 'autoMuteConference' && $name != 'codecDN') {
 			//error_log($name . ": " . $value);
 			$settingsArray[$name]['name'] = $name;
             $settingsArray[$name]['value'] = $value;
@@ -84,6 +84,28 @@ if (isset($_POST['submit'])) {
 	}
 	
 	$conferenceResponse = databaseQuery('updateConferenceSetting', $conferenceArray);
+		
+	if(!empty($_POST['codecDN'])){
+		//error_log("POST of codecDN: " . json_encode($_POST));
+		$conferenceArray = array();
+		
+		foreach($allConferences as $index => $conference) {
+			$conferenceName = $conference['conferenceName'];
+			//error_log("Conference Name: " . $conferenceName);
+			
+			$conferenceArray[$conferenceName]['setting'] = 'codecDN';
+			$conferenceArray[$conferenceName]['name'] = $conferenceName;
+			
+			if($_POST['codecDN'][$index]){
+				$conferenceArray[$conferenceName]['value'] = $_POST['codecDN'][$index];
+			} else {
+				$conferenceArray[$conferenceName]['value'] = NULL;
+			}
+		}
+	}
+	//error_log("POST of conferenceArray: " . json_encode($conferenceArray));
+	$conferenceResponse = databaseQuery('updateConferenceSetting', $conferenceArray);
+
 }
 
 $savedsetting = databaseQuery('readAllSettings', 'blah');
@@ -104,7 +126,7 @@ $allConferences = databaseQuery('allConferences', 'blah');
                 <table id="settingsForm" class="tableStyle">
                     <thead>
                         <tr>
-                            <th>Setting</th><th colspan="2">Value</th>
+                            <th colspan="2">Setting</th><th colspan="2">Value</th>
                         </tr>
                     </thead>
 
@@ -120,7 +142,7 @@ $allConferences = databaseQuery('allConferences', 'blah');
 									if ($setting['name'] == 'mcuPassword') {
 										echo '
 										<tr>
-											<td valign="top">
+											<td valign="top" colspan="2">
 												<label for="setting">'.$setting['displayName'].'</label>
 											</td>
 											<td valign="top" colspan="2">
@@ -131,7 +153,7 @@ $allConferences = databaseQuery('allConferences', 'blah');
 									else {
 										echo '
 										<tr>
-											<td valign="top">
+											<td valign="top" colspan="2">
 												<label for="setting">'.$setting['displayName'].'</label>
 											</td>
 											<td valign="top" colspan="2">
@@ -145,7 +167,7 @@ $allConferences = databaseQuery('allConferences', 'blah');
 								
 							}
 							
-							echo '<tr><th>Conference</th><th>Auto-Expand</th><th>Auto-Mute</th></tr>';
+							echo '<tr><th>Conference</th><th>Auto-Expand</th><th>Auto-Mute</th><th>Codec DN</th></tr>';
 							
 							foreach ($allConferences as $conferenceRow) {
 								
@@ -181,6 +203,12 @@ $allConferences = databaseQuery('allConferences', 'blah');
 										
 									}
 									echo '</td>';
+									
+									echo '<td valign="top">';
+									
+									echo '<input type="text" name="codecDN[]" value="' . $conferenceRow['codecDN'] . '" maxlength="256">';
+									
+									echo '</td>';
 									echo '</tr>';
 									
 								}
@@ -188,7 +216,7 @@ $allConferences = databaseQuery('allConferences', 'blah');
                         ?>
 
                         <tr>
-                            <td colspan="3">
+                            <td colspan="4">
                                 <input type="submit" name="submit" value="Submit" class="button">
                             </td>
                         </tr>
@@ -199,7 +227,7 @@ $allConferences = databaseQuery('allConferences', 'blah');
 				<table id="settingsForm" class="tableStyle">
                     <tbody>
 						<tr>
-							<td colspan="3">
+							<td colspan="4">
 								<input type="submit" value="Back to Webapp" />
 							</td>
 						</tr>

@@ -108,15 +108,6 @@ function databaseConnect()
         ('domainName', 'Domain Name'),
         ('waitingRoom', 'Waiting Room Conference'),
         ('loopDN', 'Loop Number'),
-        ('codec1', 'Conference 1 Codec Number'),
-        ('codec2', 'Conference 2 Codec Number'),
-        ('codec3', 'Conference 3 Codec Number'),
-        ('codec4', 'Conference 4 Codec Number'),
-        ('codec5', 'Conference 5 Codec Number'),
-        ('codec6', 'Conference 6 Codec Number'),
-        ('codec7', 'Conference 7 Codec Number'),
-        ('codec8', 'Conference 8 Codec Number'),
-        ('codec9', 'Conference 9 Codec Number'),
 		('timerParticipantsDB', 'MCU Participant Refresh Timer (ms)'),
 		('timerConferencesDB', 'MCU Conference Refresh Timer (ms)'),
 		('timerPanePlacementDB', 'MCU Pane Placement Refresh Timer (ms)'),
@@ -142,6 +133,7 @@ function databaseConnect()
             `conferenceId` int(31) NOT NULL,
             `layout` int(31) NOT NULL,
             `savedLayout` int(11) DEFAULT NULL,
+			`codecDN` int(11) DEFAULT NULL,
 			`autoExpand` tinyint(1) NOT NULL DEFAULT '0',
 			`autoMute` tinyint(1) NOT NULL DEFAULT '0',
             PRIMARY KEY (`id`),
@@ -153,7 +145,6 @@ function databaseConnect()
         $sql = "CREATE TABLE IF NOT EXISTS `participants` (
           `id` int(11) NOT NULL AUTO_INCREMENT,
           `participantName` varchar(256) NOT NULL,
-          `participantPreview` varchar(256) DEFAULT NULL,
           `displayName` varchar(256) NOT NULL,
           `audioRxMuted` tinyint(1) NOT NULL,
           `videoRxMuted` tinyint(1) NOT NULL,
@@ -293,6 +284,7 @@ function refreshWeb($mcuUsername, $mcuPassword)
         $conferenceArray[$conferenceName]['conferenceName'] = $conferenceName;
         $conferenceArray[$conferenceName]['customLayout'] = $conferenceInstance['layout'];
         $conferenceArray[$conferenceName]['uniqueId'] = $conferenceInstance['conferenceId'];
+		$conferenceArray[$conferenceName]['codecDN'] = $conferenceInstance['codecDN'];
 
         $data['conferenceName'] = $conferenceName;
         $readPanesFromDB = databaseQuery('readPanesDB', $data);
@@ -324,7 +316,6 @@ function refreshWeb($mcuUsername, $mcuPassword)
                     $participantArray[$i]['pane'] = $currentPane['pane'];
                 }
 				
-                $participantArray[$i]['participantPreview'] = $participantInstance['participantPreview'];
                 $participantArray[$i]['displayName'] = $participantInstance['displayName'];
                 $participantArray[$i]['audioRxMuted'] = filter_var($participantInstance['audioRxMuted'], FILTER_VALIDATE_BOOLEAN);
                 $participantArray[$i]['videoRxMuted'] = filter_var($participantInstance['videoRxMuted'], FILTER_VALIDATE_BOOLEAN);
@@ -441,7 +432,11 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 	
 	$participantConferenceCount = array();
 	
+	//error_log("autoMuteConferences: " . json_encode($autoMuteConferences));
 	
+	if ($autoMuteConferences == 0) {
+		$autoMuteConferences = array();
+	}
 	
     if (isset($participantEnumerate['participants'])) {
         foreach ($participantEnumerate['participants'] as $entry => $participantInstance) {
@@ -456,7 +451,7 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 				$participantConferenceCount[$participantInstance['conferenceName']] = intval($participantConferenceCount[$participantInstance['conferenceName']]) + 1;
 
                 $participantArray[$i]['participantName'] = $participantInstance['participantName'];
-
+				/*
                 $data['participantName'] = $participantInstance['participantName'];
                 $data['conferenceName'] = $participantInstance['conferenceName'];
 
@@ -467,26 +462,13 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
                 } else {
                     $participantArray[$i]['pane'] = $currentPane['pane'];
                 }
-
-                $participantArray[$i]['participantPreview'] = $participantInstance['currentState']['previewURL'];
+				*/
                 $participantArray[$i]['displayName'] = $participantInstance['currentState']['displayName'];
                 $participantArray[$i]['audioRxMuted'] = $participantInstance['currentState']['audioRxMuted'];
                 $participantArray[$i]['videoRxMuted'] = $participantInstance['currentState']['videoRxMuted'];
                 $participantArray[$i]['audioTxMuted'] = $participantInstance['currentState']['audioTxMuted'];
                 $participantArray[$i]['videoTxMuted'] = $participantInstance['currentState']['videoTxMuted'];
 				$participantArray[$i]['focusType'] = $participantInstance['currentState']['focusType'];
-				
-				/*
-				if ($participantInstance['currentState']['displayName'] == '__') {
-					
-					error_log("Conference Name: " . $participantInstance['conferenceName']);
-					error_log("Focus Type: " . $participantInstance['currentState']['focusType']);
-					
-					if ($participantInstance['currentState']['focusType'] == "participant") {
-						error_log("Layout Source: " . $participantInstance['currentState']['layoutSource']);
-					}					
-				}
-				*/
 				
 				if ($participantInstance['currentState']['focusType'] == "participant" && $participantInstance['currentState']['layoutSource'] == "conferenceCustom") {
 					$participantArray[$i]['focusType'] = "voiceActivated";
@@ -560,8 +542,16 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 			$currentLayout = $conference['layout'];
 			
 			$oldParticipantCount = apc_fetch('oldParticipantCount',$success);
+			
+			if (!isset($oldParticipantCount[$conferenceName])) {
+				$oldParticipantCount[$conferenceName] = 0;
+			}
+			
+			if (!isset($participantConferenceCount[$conferenceName])) {
+				$participantConferenceCount[$conferenceName] = 0;
+			}
 					
-			if (intval($oldParticipantCount[$conferenceName]) !== intval($participantConferenceCount[$conferenceName]) && $success === TRUE) {
+			if ($success === TRUE && intval($oldParticipantCount[$conferenceName]) !== intval($participantConferenceCount[$conferenceName])) {
 				
 				//error_log("conference Name: " . $conferenceName);
 				//error_log("Conference Old Count: " . $oldParticipantCount[$conferenceName]);
@@ -623,7 +613,9 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 	apc_store('oldParticipantCount',$participantConferenceCount);
 	
 	//Write participant info to database
+	//error_log("Participant Array: " . json_encode($participantArray));
     databaseQuery('updateParticipantsDB', $participantArray);
+	
     echo json_encode(array('alert' => ''));
     return($participantArray);
 }
@@ -679,41 +671,31 @@ function writeConferenceEnumerate($mcuUsername, $mcuPassword)
 //This function reads panePlacement data from the MCU and writes it to the database
 function writePanesDB($mcuUsername, $mcuPassword, $conferenceArray)
 {
-	/*
-    $conferenceArray = [];
-    $allConferences = databaseQuery('allConferences', 'NA');
 
-    foreach ($allConferences as $conferenceInstance) {
-        $conferenceName = $conferenceInstance['conferenceName'];
-        $conferenceArray[$conferenceName]['conferenceName'] = $conferenceName;
-        $conferenceArray[$conferenceName]['customLayout'] = $conferenceInstance['layout'];
-        $conferenceArray[$conferenceName]['uniqueId'] = $conferenceInstance['conferenceId'];
-    }
-	*/
-	//error_log("Conference Array: " . json_encode($conferenceArray));
-	
-    foreach ($conferenceArray as $conference) {
-        $j = 0;
-        $conferenceName = $conference['conferenceName'];
-		
-		if (count($conferenceArray) == 1) {
-			//error_log("Conference: " . json_encode($conference));
+	if (count($conferenceArray) > 0) {
+		foreach ($conferenceArray as $conference) {
+			$j = 0;
+			$conferenceName = $conference['conferenceName'];
+			
+			$currentPanePlacement = checkPanePlacement($conferenceName, $mcuUsername, $mcuPassword);
+					
+			foreach ($currentPanePlacement['panePlacement']['panes'] as $pane) {
+				$conferenceArray[$conferenceName]['panes']['pane'.$j] = $pane;
+				$j++;
+			}
+			//error_log(json_encode($conferenceArray[$conferenceName]));
+			$updatePanesDB = databaseQuery('updatePanesDB', $conferenceArray[$conferenceName]);			
+			
 		}
-
-        $currentPanePlacement = checkPanePlacement($conferenceName, $mcuUsername, $mcuPassword);
-        		
-		foreach ($currentPanePlacement['panePlacement']['panes'] as $pane) {
-            $conferenceArray[$conferenceName]['panes']['pane'.$j] = $pane;
-            $j++;
-        }
-		if (count($conferenceArray) == 1) {
-			//error_log("updatePanesDB: " . json_encode($conferenceArray[$conferenceName]));
-		}		
 		
-		$updatePanesDB = databaseQuery('updatePanesDB', $conferenceArray[$conferenceName]);			
+		$updatePanesDB = TRUE;
 		
-    }
-
+	} else {
+		
+		$updatePanesDB = FALSE;
+		
+	}
+	
     return($updatePanesDB);
 }
 
@@ -818,13 +800,15 @@ function updateParticipantsDB($data, $connection)
 
     foreach ($data as $rows => $row) {
         //see if this particicpant is in the participants table
-        $sql = "SELECT * FROM participants
-        WHERE participantName = '".mysqli_real_escape_string($connection, $row['participantName'])."'";
-        $findParticipant = mysqli_query($connection, $sql);
-
+        $sql = "SELECT * FROM participants WHERE participantName = '" . mysqli_real_escape_string($connection, $row['participantName']) . "'";
+		$findParticipant = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
+		
+		if ($row['displayName'] != "_" && $row['displayName'] != "__") {
+			//error_log("find Participant: " . json_encode($findParticipant));
+		}
+		
         //grab the conferenceTableId field to insert into the participant table
-        $sqlConference = "SELECT id FROM conferences WHERE conferenceName='"
-            .mysqli_real_escape_string($connection, $row['conferenceName'])."'";
+        $sqlConference = "SELECT id FROM conferences WHERE conferenceName='" . mysqli_real_escape_string($connection, $row['conferenceName']) . "'";
 
         $conferenceTableId = mysqli_query($connection, $sqlConference);
 
@@ -834,10 +818,9 @@ function updateParticipantsDB($data, $connection)
         }
 		
         //if this participant isn't in the participants table, insert it
-        if (mysqli_num_rows($findParticipant) == 0) {
-            $sqlInsert = "INSERT INTO participants
+        if (!isset($findParticipant['participantName'])) {
+            $sql = "INSERT INTO participants
             (`participantName`,
-            `participantPreview`,
             `displayName`,
             `audioRxMuted`,
             `videoRxMuted`,
@@ -852,7 +835,6 @@ function updateParticipantsDB($data, $connection)
             `packetLossWarning`,
             `packetLossCritical`)
             VALUES ('".mysqli_real_escape_string($connection, $row['participantName'])."',
-            '".mysqli_real_escape_string($connection, $row['participantPreview'])."',
             '".mysqli_real_escape_string($connection, $row['displayName'])."',
             '".($row['audioRxMuted']?1:0)."',
             '".($row['videoRxMuted']?1:0)."',
@@ -866,11 +848,10 @@ function updateParticipantsDB($data, $connection)
             '".($row['important']?1:0)."',
             '".($row['packetLossWarning']?1:0)."',
             '".($row['packetLossCritical']?1:0)."')";
-            $insertParticipant = mysqli_query($connection, $sqlInsert);
+            //$insertParticipant = mysqli_query($connection, $sqlInsert);
 			
         } else {
             $sql = "UPDATE participants SET
-            `participantPreview` = '".mysqli_real_escape_string($connection, $row['participantPreview'])."',
             `displayName` = '".mysqli_real_escape_string($connection, $row['displayName'])."',
             `audioRxMuted` = ".($row['audioRxMuted']?1:0).",
             `videoRxMuted` = ".($row['videoRxMuted']?1:0).",
@@ -886,10 +867,12 @@ function updateParticipantsDB($data, $connection)
             `packetLossWarning` = ".($row['packetLossWarning']?1:0).",
             `packetLossCritical` = ".($row['packetLossCritical']?1:0)."
             WHERE `participantName` = ".mysqli_real_escape_string($connection, $row['participantName']);
-            $updateParticipant = mysqli_query($connection, $sql);
-			
         }
-
+		if ($row['displayName'] != "_" && $row['displayName'] != "__") {
+			//error_log("Update Participant SQL: " . $sql);
+		}
+		$updateParticipant = mysqli_query($connection, $sql);
+		
         $existingParticipants .=  mysqli_real_escape_string($connection, $row['participantName']).",";
     }
 
@@ -956,46 +939,62 @@ function updateParticipantsDB($data, $connection)
 function updatePanesDB($data, $connection)
 {
     $mysqlquery = null;
-    //Loop thorugh each conference in the conferences table
-    //foreach ($data as $conferences => $conferenceDetail) {
-        $sql = "SELECT id FROM conferences WHERE conferenceId = '".$data['uniqueId']."'";
-        $conference = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
-        $conferenceTableId = $conference['id'];
 
-        $numberOfPanes = count($data['panes']);
-        $sql = "DELETE FROM panes WHERE conferenceTableId='" . $conferenceTableId . "' AND pane >'" . $numberOfPanes . "'";
-        $mysqlquery = mysqli_query($connection, $sql);
+	//$sql = "SELECT id FROM conferences WHERE conferenceId = '".$data['uniqueId']."'";
+	//$conference = mysqli_fetch_array(mysqli_query($connection, $sql), MYSQLI_ASSOC);
+	$conferenceTableId = $data['uniqueId'];
+	//error_log(json_encode($data));
+	$numberOfPanes = count($data['panes']);
+	$sql = "DELETE FROM panes WHERE conferenceTableId='" . $conferenceTableId . "' AND pane >'" . $numberOfPanes . "'";
+	$mysqlquery = mysqli_query($connection, $sql);
 
-        //Loop through each pane of the conference
-        foreach ($data['panes'] as $paneNumber => $paneDetail) {
+	//Loop through each pane of the conference
+	foreach ($data['panes'] as $paneNumber => $paneDetail) {
 
-            if ($paneDetail['type'] == 'participant') {
+		if ($paneDetail['type'] == 'participant') {
 
-                //insert pane or overwrite existing
-                $paneSQL = "INSERT INTO panes (pane, conferenceTableId, type, participantName, participantProtocol, participantType) VALUES('" . $paneDetail['index'] . "', '" . $conferenceTableId . "', '" . $paneDetail['type'] . "', '" . $paneDetail['participantName'] . "', '" . $paneDetail['participantProtocol'] . "', '" . $paneDetail['participantType'] . "') ON DUPLICATE KEY UPDATE type='" . $paneDetail['type'] . "', participantName='" . $paneDetail['participantName'] . "', participantProtocol='" . $paneDetail['participantProtocol'] . "', participantType='" . $paneDetail['participantType'] . "'";
+			//insert pane or overwrite existing
+			$paneSQL = "INSERT INTO panes (pane, conferenceTableId, type, participantName, participantProtocol, participantType) VALUES('" . $paneDetail['index'] . "', '" . $conferenceTableId . "', '" . $paneDetail['type'] . "', '" . $paneDetail['participantName'] . "', '" . $paneDetail['participantProtocol'] . "', '" . $paneDetail['participantType'] . "') ON DUPLICATE KEY UPDATE type='" . $paneDetail['type'] . "', participantName='" . $paneDetail['participantName'] . "', participantProtocol='" . $paneDetail['participantProtocol'] . "', participantType='" . $paneDetail['participantType'] . "'";
+			
+		} else {
 
-            } else {
+			//insert pane or overwrite existing
+			$paneSQL = "INSERT INTO panes (pane, conferenceTableId, type, participantName, participantProtocol, participantType) VALUES('" . $paneDetail['index'] . "', '" . $conferenceTableId . "', '" . $paneDetail['type'] . "', NULL, NULL, NULL) ON DUPLICATE KEY UPDATE type='" . $paneDetail['type'] . "', participantName=NULL, participantProtocol=NULL, participantType=NULL";
 
-                //insert pane or overwrite existing
-                $paneSQL = "INSERT INTO panes (pane, conferenceTableId, type, participantName, participantProtocol, participantType) VALUES('" . $paneDetail['index'] . "', '" . $conferenceTableId . "', '" . $paneDetail['type'] . "', NULL, NULL, NULL) ON DUPLICATE KEY UPDATE type='" . $paneDetail['type'] . "', participantName=NULL, participantProtocol=NULL, participantType=NULL";
+		}
 
-            }
-
-            $mysqlquery = mysqli_query($connection, $paneSQL);
-        }
-
-    //}
-    return($mysqlquery);
+		$paneResult = mysqli_query($connection, $paneSQL);
+		
+		/*
+		//error_log("Pane Detail: " . json_encode($paneDetail));
+		if ($paneResult && $paneDetail['type'] == 'participant') {
+			$findPaticipant['participantName'] = $paneDetail['participantName'];
+			$participantInfo = databaseQuery('participantInfo', $findPaticipant);
+			
+			//Now we need to write the new pane ownership information to the panePlacement table
+			$addPaneEntry['action'] = "updatePane";
+			$addPaneEntry['pane'] = $paneDetail['index'];
+			$addPaneEntry['conferenceTableId'] = $conferenceTableId;
+			$addPaneEntry['participantTableId'] = $participantInfo['id'];
+			$addPaneEntryResult = databaseQuery('panePlacementUpdate', $addPaneEntry);
+		}
+		*/
+	}
+		
+    return($paneResult);
 }
 
 function findCurrentPane($data, $connection)
 {
-    $sql = "SELECT panePlacement.pane FROM panePlacement
+    /*$sql = "SELECT panePlacement.pane FROM panePlacement
     INNER JOIN conferences ON panePlacement.conferenceTableId = conferences.id
     INNER JOIN participants ON panePlacement.participantTableId = participants.id
     WHERE participantName='".$data['participantName']."'
     AND conferences.conferenceName='".$data['conferenceName']."'";
-
+	*/
+	
+	$conferenceInfo = databaseQuery('conferenceInfo', $data['conferenceName']);
+	$sql = "SELECT * FROM panes WHERE participantName='".$data['participantName']."' AND conferenceTableId='".$conferenceInfo['id']."'";
 
 	//error_log("findCurrentPane SQL: " . $sql);
     $mysqlquery = mysqli_query($connection, $sql);
@@ -1144,7 +1143,14 @@ function codecInfo($conferenceName, $connection)
 function updateConferenceSetting($data, $connection)
 {
     foreach ($data as $conference) {
-        $sql = "UPDATE conferences SET " . $conference['setting'] . " = " . $conference['value'] . " WHERE conferenceName = '" . $conference['name'] . "'";
+		
+		if($conference['setting'] == "codecDN" && $conference['value'] == NULL){
+			$value = "NULL";
+		} else {
+			$value = $conference['value'];
+		}
+		
+        $sql = "UPDATE conferences SET " . $conference['setting'] . " = " . $value . " WHERE conferenceName = '" . $conference['name'] . "'";
         $mysqlquery = mysqli_query($connection, $sql);
         
 		//error_log("updateConferenceSetting SQL: " . $sql);
@@ -1432,8 +1438,8 @@ function panePlacementUpdate($data, $connection)
     } elseif ($data['action'] === "addPaneEntry") {
 
         $sql = "INSERT INTO panePlacement (`pane`, `conferenceTableId`, `participantTableId`) VALUES ('" . $pane . "','" . $conferenceTableId . "','" . $participantTableId . "')";
-
-        $result = mysqli_query($connection, $sql);
+		
+		$result = mysqli_query($connection, $sql);
 
     } elseif ($data['action'] === "deletePaneEntry") {
         //delete takes the conferenceTableId and pane number and sets participantTableId, type, and loopParticipantName to NULL
@@ -1442,33 +1448,14 @@ function panePlacementUpdate($data, $connection)
         $result = mysqli_query($connection, $sql);
 
     } elseif ($data['action'] === "updatePane") {
-        //update requires pane, conferenceTableId, and participantTableId and modifies an entry into the panePlacementTable when a participant is moved and pane assigned
-
-        //Check if the moving participant belongs to a "hidden" pane outside the scope of the current layout
-        $currentPane['action'] = 'currentPane';
-        $currentPane['conferenceTableId'] = $conferenceTableId;
-        $currentPane['participantTableId'] = $participantTableId;
-        $currentPanePaneResult = databaseQuery('panePlacementUpdate', $currentPane);
-
-        //Check if the SQL query returned any entries for the moving participant that need to be deleted
-		if ($currentPanePaneResult) {
-			if (mysqli_num_rows($currentPanePaneResult) > 0) {
-
-				$currentPanes = mysqli_fetch_all($currentPanePaneResult, MYSQLI_ASSOC);
-
-				foreach ($currentPanes as $paneInstance) {
-					$deletePane['action'] = "delete";
-					$deletePane['pane'] = $paneInstance['pane'];
-					$deletePane['conferenceTableId'] = $data['conferenceTableId'];
-					$deletePaneResult = databaseQuery('panePlacementUpdate', $deletePane);
-				}
-			}
-		}
-		
+        
         //Build and run a SQL query to see if there is already a participant in the pane you are moving the new participant
         $overwritePaneSQL = "SELECT id FROM panePlacement WHERE conferenceTableId = '" . $data['conferenceTableId'] . "' AND pane = '" . $data['pane'] . "'";
         $overwritePaneResults = mysqli_query($connection, $overwritePaneSQL);
-
+		
+		//error_log("updatePane overwrite sql: " . $overwritePaneSQL);
+		//error_log("updatePane overwrite result: " . $overwritePaneResults);
+		
         //Check if the SQL query returned a current pane to overwrite
         if (mysqli_num_rows($overwritePaneResults) == 0) {
             //If the pane is NOT assigned to a participant then insert a new record
@@ -1479,8 +1466,10 @@ function panePlacementUpdate($data, $connection)
             //If an entry is found, then update it
             $sql = "UPDATE panePlacement SET participantTableId = '" . $data['participantTableId'] . "', loopParticipantId = NULL WHERE id = '" . $overwritePaneId['id'] . "'";
         }
-
-        $result = mysqli_query($connection, $sql);
+		
+		$result = mysqli_query($connection, $sql);
+		//error_log("updatePane write sql: " . $sql);
+		//error_log("updatePane write result: " . json_encode($result));
 
     } elseif ($data['action'] === "customLayoutPaneUpdate") {
 

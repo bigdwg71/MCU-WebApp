@@ -115,7 +115,6 @@ function refreshWeb(refreshType) {
             content[0] += '<thead>';
             content[0] += '<tr>';
             content[0] += '<th class="participantName hide">ID</th>';
-            //content[0] += '<th class="participantPreview">Preview</th>';
             content[0] += '<th class="count">#</th>';
             content[0] += '<th class="displayName">Name</th>';
             content[0] += '<th class="specialGrid">Special Layouts</th>';
@@ -155,7 +154,8 @@ function refreshWeb(refreshType) {
                     isDisabled9,
                     isDisabled4,
                     isDisabled43,
-					isDisabled27,
+					isDisabled25,
+                    isDisabled27,
                     modalId,
                     titlePosition,
                     time,
@@ -185,6 +185,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
+					isDisabled25 = '';
 					isDisabled27 = '';
                     layoutName = '1x1';
                 } else if (layoutID + 1 === 16) {
@@ -197,7 +198,8 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '1x2';
                 } else if (layoutID + 1 === 2) {
                     isDisabled1 = '';
@@ -209,7 +211,8 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '2x2';
                 } else if (layoutID + 1 === 8) {
                     isDisabled8 = ' disabled';
@@ -221,7 +224,8 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '3x2';
                 } else if (layoutID + 1 === 53) {
                     isDisabled53 = ' disabled';
@@ -233,7 +237,8 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '4x2';
                 } else if (layoutID + 1 === 3) {
                     isDisabled3 = ' disabled';
@@ -245,7 +250,8 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '3x3';
                 } else if (layoutID + 1 === 9) {
                     isDisabled9 = ' disabled';
@@ -257,7 +263,8 @@ function refreshWeb(refreshType) {
                     isDisabled2 = '';
                     isDisabled4 = '';
                     isDisabled43 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '4x3';
                 } else if (layoutID + 1 === 4) {
                     isDisabled4 = ' disabled';
@@ -269,7 +276,8 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled2 = '';
                     isDisabled43 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '4x4';
                 } else if (layoutID + 1 === 43) {
                     isDisabled43 = ' disabled';
@@ -281,8 +289,22 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
-                    isDisabled27 = '';
+                    isDisabled25 = '';
+					isDisabled27 = '';
                     layoutName = '5x4';
+                } else if (layoutID + 1 === 25) {
+                    isDisabled43 = '';
+                    isDisabled1 = '';
+                    isDisabled16 = '';
+                    isDisabled8 = '';
+                    isDisabled53 = '';
+                    isDisabled3 = '';
+                    isDisabled9 = '';
+                    isDisabled4 = '';
+                    isDisabled2 = '';
+                    isDisabled25 = ' disabled';
+					isDisabled27 = '';
+                    layoutName = '25';
                 } else if (layoutID + 1 === 27) {
                     isDisabled43 = '';
                     isDisabled1 = '';
@@ -293,7 +315,8 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
-                    isDisabled27 = ' disabled';
+					isDisabled25 = '';
+					isDisabled27 = ' disabled';
                     layoutName = '27';
                 } else if (layoutID + 1 === 33) {
                     isDisabled43 = '';
@@ -305,6 +328,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
+					isDisabled25 = '';
                     isDisabled27 = '';
                     layoutName = 'Important';
                     conferenceImportant = true;
@@ -318,6 +342,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
+					isDisabled25 = '';
                     isDisabled27 = '';
                     layoutName = 'Important';
                     conferenceImportant = true;
@@ -331,6 +356,7 @@ function refreshWeb(refreshType) {
                     isDisabled9 = '';
                     isDisabled4 = '';
                     isDisabled2 = '';
+					isDisabled25 = '';
                     isDisabled27 = '';
                     layoutName = 'Custom';
                 }
@@ -360,7 +386,8 @@ function refreshWeb(refreshType) {
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="9" value="4x3"' + isDisabled9 + '><img src="css/images/layout4x3.png" alt="4x3"/></button></li>';
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="4" value="4x4"' + isDisabled4 + '><img src="css/images/layout4x4.png" alt="4x4"/></button></li>';
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="27" value="27"' + isDisabled27 + '><img src="css/images/layout27.png" alt="27"/></button></li>';
+                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="25" value="25"' + isDisabled25 + '><img src="css/images/layout25.png" alt="25"/></button></li>';
+				content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="27" value="27"' + isDisabled27 + '><img src="css/images/layout27.png" alt="27"/></button></li>';
                 content[0] += '</ul>';
                 content[0] += '<form id="panePlacement' + conferenceArrayInnerValue.uniqueId + '">';
 
@@ -1062,6 +1089,8 @@ $(document).ready(function () {
                 destType = "focus";
             } else if (destLayout === 22 || destLayout === 32) {
                 destType = "special";
+            } else if (destLayout === 26 || destLayout === 24) {
+                destType = "eyeline";
             } else {
                 destType = "grid";
             }
