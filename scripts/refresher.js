@@ -156,6 +156,8 @@ function refreshWeb(refreshType) {
                     isDisabled43,
 					isDisabled25,
                     isDisabled27,
+					isDisabled28,
+					isDisabled49,
                     modalId,
                     titlePosition,
                     time,
@@ -172,192 +174,69 @@ function refreshWeb(refreshType) {
                 content[0] += '<tr class="tableHeader" data-conf="' + currentConference + '">';
                 //Set number of participants based on current layout
                 customLayout = conferenceArrayInnerValue.customLayout;
-
+				
+				isDisabled1 = '';
+				isDisabled16 = '';
+				isDisabled2 = '';
+				isDisabled8 = '';
+				isDisabled53 = '';
+				isDisabled3 = '';
+				isDisabled9 = '';
+				isDisabled4 = '';
+				isDisabled43 = '';
+				isDisabled25 = '';
+				isDisabled27 = '';
+				isDisabled28 = '';
+				isDisabled49 = '';
+				
                 //Print the conferences. We also mark the title position so we can append a button to it later
                 layoutID = parseInt(customLayout, 10) - 1;
                 if (layoutID + 1 === 1) {
                     isDisabled1 = ' disabled';
-                    isDisabled16 = '';
-                    isDisabled2 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled43 = '';
-					isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '1x1';
                 } else if (layoutID + 1 === 16) {
-                    isDisabled1 = '';
                     isDisabled16 = ' disabled';
-                    isDisabled2 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled43 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '1x2';
                 } else if (layoutID + 1 === 2) {
-                    isDisabled1 = '';
-                    isDisabled16 = '';
                     isDisabled2 = ' disabled';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled43 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '2x2';
                 } else if (layoutID + 1 === 8) {
                     isDisabled8 = ' disabled';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled2 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled43 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '3x2';
                 } else if (layoutID + 1 === 53) {
                     isDisabled53 = ' disabled';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled2 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled43 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '4x2';
                 } else if (layoutID + 1 === 3) {
                     isDisabled3 = ' disabled';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled2 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled43 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '3x3';
                 } else if (layoutID + 1 === 9) {
                     isDisabled9 = ' disabled';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled2 = '';
-                    isDisabled4 = '';
-                    isDisabled43 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '4x3';
                 } else if (layoutID + 1 === 4) {
                     isDisabled4 = ' disabled';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled2 = '';
-                    isDisabled43 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '4x4';
                 } else if (layoutID + 1 === 43) {
                     isDisabled43 = ' disabled';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled2 = '';
-                    isDisabled25 = '';
-					isDisabled27 = '';
                     layoutName = '5x4';
                 } else if (layoutID + 1 === 25) {
-                    isDisabled43 = '';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled2 = '';
                     isDisabled25 = ' disabled';
-					isDisabled27 = '';
                     layoutName = '25';
                 } else if (layoutID + 1 === 27) {
-                    isDisabled43 = '';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled2 = '';
-					isDisabled25 = '';
 					isDisabled27 = ' disabled';
                     layoutName = '27';
+                } else if (layoutID + 1 === 28) {
+                    isDisabled28 = ' disabled';
+                    layoutName = '28';
+                } else if (layoutID + 1 === 49) {
+					isDisabled49 = ' disabled';
+                    layoutName = '49';
                 } else if (layoutID + 1 === 33) {
-                    isDisabled43 = '';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled2 = '';
-					isDisabled25 = '';
-                    isDisabled27 = '';
                     layoutName = 'Important';
                     conferenceImportant = true;
                 } else if (layoutID + 1 === 23) {
-                    isDisabled43 = '';
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled2 = '';
-					isDisabled25 = '';
-                    isDisabled27 = '';
                     layoutName = 'Important';
                     conferenceImportant = true;
                 } else {
-                    isDisabled1 = '';
-                    isDisabled16 = '';
-                    isDisabled43 = '';
-                    isDisabled8 = '';
-                    isDisabled53 = '';
-                    isDisabled3 = '';
-                    isDisabled9 = '';
-                    isDisabled4 = '';
-                    isDisabled2 = '';
-					isDisabled25 = '';
-                    isDisabled27 = '';
                     layoutName = 'Custom';
                 }
                 modalId = "openModal" + conferenceArrayInnerValue.uniqueId;
@@ -388,6 +267,8 @@ function refreshWeb(refreshType) {
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4"/></button></li>';
                 content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="25" value="25"' + isDisabled25 + '><img src="css/images/layout25.png" alt="25"/></button></li>';
 				content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="27" value="27"' + isDisabled27 + '><img src="css/images/layout27.png" alt="27"/></button></li>';
+				content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="28" value="28"' + isDisabled28 + '><img src="css/images/layout28.png" alt="28"/></button></li>';
+				content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="49" value="49"' + isDisabled49 + '><img src="css/images/layout49.png" alt="49"/></button></li>';
                 content[0] += '</ul>';
                 content[0] += '<form id="panePlacement' + conferenceArrayInnerValue.uniqueId + '">';
 
@@ -943,7 +824,7 @@ function setSpecialLayout(scrubbedParticipantList, participantName, participantP
 //Function to tell refresher.php to update the DB with all participant information
 function writeParticipantEnumerate() {
     "use strict";
-
+	
     //post this information to refresher.php to take action
     $.ajax({
         type: "POST",
@@ -1011,6 +892,7 @@ $.customPOST = function (data, callback) {
 $(document).ready(function () {
     "use strict";
     var i;
+	
     //Read DB settings and set variables here
     $.ajax({
         type: "POST",
@@ -1077,6 +959,10 @@ $(document).ready(function () {
         } else {
             if (sourceLayout === 0) {
                 sourceType = "focus";
+            } else if (sourceLayout === 22 || sourceLayout === 32) {
+                sourceType = "special";
+            } else if (sourceLayout === 26 || sourceLayout === 24) {
+                sourceType = "eyeline";
             } else {
                 sourceType = "grid";
             }

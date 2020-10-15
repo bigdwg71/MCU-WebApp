@@ -432,13 +432,7 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 	
 	$participantConferenceCount = array();
 	
-	//error_log("autoMuteConferences: " . json_encode($autoMuteConferences));
-	
-	if ($autoMuteConferences == 0) {
-		$autoMuteConferences = array();
-	}
-	
-    if (isset($participantEnumerate['participants'])) {
+	if (isset($participantEnumerate['participants'])) {
         foreach ($participantEnumerate['participants'] as $entry => $participantInstance) {
             if (is_array($participantInstance)) {
 				
@@ -587,9 +581,11 @@ function writeParticipantEnumerate($mcuUsername, $mcuPassword)
 					$newConferenceLayout = 4;
 				} elseif ($conferenceCount >= 18) {
 					$newConferenceLayout = 43;
+				} else {
+					$newConferenceLayout = 0;
 				}
 				
-				if ($currentLayout != $newConferenceLayout) {
+				if ($currentLayout != $newConferenceLayout && $newConferenceLayout != 0) {
 					$result = mcuCommand(
 						array('prefix' => 'conference.'),
 						'modify',
@@ -734,7 +730,7 @@ function readPanesDB($data, $connection)
 
     } else {
 
-        $result = array('alert' => '');
+        $result = [];
 
     }
 
@@ -956,29 +952,33 @@ function updatePanesDB($data, $connection)
 			//insert pane or overwrite existing
 			$paneSQL = "INSERT INTO panes (pane, conferenceTableId, type, participantName, participantProtocol, participantType) VALUES('" . $paneDetail['index'] . "', '" . $conferenceTableId . "', '" . $paneDetail['type'] . "', '" . $paneDetail['participantName'] . "', '" . $paneDetail['participantProtocol'] . "', '" . $paneDetail['participantType'] . "') ON DUPLICATE KEY UPDATE type='" . $paneDetail['type'] . "', participantName='" . $paneDetail['participantName'] . "', participantProtocol='" . $paneDetail['participantProtocol'] . "', participantType='" . $paneDetail['participantType'] . "'";
 			
+			/* BAD CODE?
+			$findPaticipant['participantName'] = $paneDetail['participantName'];
+			$participantInfo = databaseQuery('participantInfo', $findPaticipant);
+			
+			//If the type is participant, add a panePlacement DB entry
+			$updatePane['action'] = "updatePane";
+			$updatePane['pane'] = $paneDetail['index'];
+			$updatePane['conferenceTableId'] = $conferenceTableId;
+			$updatePane['participantTableId'] = $participantInfo['id'];
+			$updatePaneResult = databaseQuery('panePlacementUpdate', $updatePane);
+			*/
 		} else {
 
 			//insert pane or overwrite existing
 			$paneSQL = "INSERT INTO panes (pane, conferenceTableId, type, participantName, participantProtocol, participantType) VALUES('" . $paneDetail['index'] . "', '" . $conferenceTableId . "', '" . $paneDetail['type'] . "', NULL, NULL, NULL) ON DUPLICATE KEY UPDATE type='" . $paneDetail['type'] . "', participantName=NULL, participantProtocol=NULL, participantType=NULL";
-
+			
+			//error_log("delete pane entry: " . $paneDetail['index'] . " from " . $conferenceTableId);
+			//If not a participant, then delete any PanePlacement DB entry that might exist for that pane
+			$deletePaneEntry['action'] = "deletePaneEntry";
+			$deletePaneEntry['pane'] = $paneDetail['index'];
+			$deletePaneEntry['conferenceTableId'] = $conferenceTableId;
+			$deletePaneEntryResult = databaseQuery('panePlacementUpdate', $deletePaneEntry);
+			
 		}
 
 		$paneResult = mysqli_query($connection, $paneSQL);
 		
-		/*
-		//error_log("Pane Detail: " . json_encode($paneDetail));
-		if ($paneResult && $paneDetail['type'] == 'participant') {
-			$findPaticipant['participantName'] = $paneDetail['participantName'];
-			$participantInfo = databaseQuery('participantInfo', $findPaticipant);
-			
-			//Now we need to write the new pane ownership information to the panePlacement table
-			$addPaneEntry['action'] = "updatePane";
-			$addPaneEntry['pane'] = $paneDetail['index'];
-			$addPaneEntry['conferenceTableId'] = $conferenceTableId;
-			$addPaneEntry['participantTableId'] = $participantInfo['id'];
-			$addPaneEntryResult = databaseQuery('panePlacementUpdate', $addPaneEntry);
-		}
-		*/
 	}
 		
     return($paneResult);
@@ -1176,11 +1176,7 @@ function readConferenceSetting($data, $connection)
 	//error_log("response SQL: " . json_encode(mysqli_fetch_all($response,MYSQLI_ASSOC)));
 	//error_log("count SQL: " . $count);
 	
-	if ($count > 0) {
-		$results = mysqli_fetch_all($response,MYSQLI_ASSOC);
-	} else {
-		$results = 0;
-	}
+	$results = mysqli_fetch_all($response,MYSQLI_ASSOC);
 
     return($results);
 }
