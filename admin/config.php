@@ -3,7 +3,7 @@
 $db_hostname = 'localhost';
 $db_username = 'root';
 $db_password = 'j1mmyk1mm3l';
-$db_database = 'mcuDB7';
+$db_database = 'mcuDB74';
 
 //read all settings from the setting table
 $allSettings = databaseQuery('readAllSettings', 'blah');

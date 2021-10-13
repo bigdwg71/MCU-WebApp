@@ -389,7 +389,7 @@ h2 {
 }
 
 
-
+/*
 #panePlacement .paneDiv {
     display: block;
     float: left;
@@ -403,11 +403,15 @@ h2 {
     width: 55px;
     float:left;
 }
+*/
 
 .layoutMenu {
     padding: 0;
     list-style: none;
     margin: 0;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
 }
 
 .layoutMenu li {
@@ -418,6 +422,8 @@ h2 {
     border: 0;
     background: none;
     padding: 5px;
+	min-width: auto;
+	margin: 2px 5px 2px 5px;
 }
 
 .layout img {
@@ -425,7 +431,7 @@ h2 {
 }
 
 .layout:disabled {
-    background: #43A942;
+    background: rgb(4, 159, 217);
 }
 
 .currentLayout {
@@ -568,7 +574,7 @@ label {
     padding-top: 12px;
     tab-size: 2;
     text-size-adjust: 100%;
-    width: 640px;
+    width: 100%;
     -webkit-box-direction: normal;
     -webkit-box-flex: 0;
     -webkit-font-smoothing: antialiased;
@@ -589,7 +595,7 @@ label {
 }
 
 .modalDialog > div {
-    width: 640px;
+    width: 720px;
     position: relative;
     margin: 2% auto;
     background: #fff;
@@ -618,7 +624,16 @@ label {
 }
 
 .modal-body {
-    padding: 24px 32px;
+    padding: 15px 10px 5px 10px;
 }
 
+.panePlacementForm {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+}
 
+.panePlacementForm .paneDiv {
+	width: 33%;
+	padding: 0px 15px 0px 15px;
+}

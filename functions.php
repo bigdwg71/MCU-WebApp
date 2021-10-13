@@ -776,9 +776,7 @@ function updateConferencesDB($data, $connection)
     }
 
     //If there are no conferences on the MCU, then truncate/clear the table
-    if ($existingConferences === "") {
-        $sql = "TRUNCATE TABLE conferences";
-    } else {
+    if ($existingConferences !== "") {
         $sql = "DELETE FROM conferences WHERE conferenceId NOT IN (".$existingConferences.")";
     }
 

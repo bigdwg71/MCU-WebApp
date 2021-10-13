@@ -255,30 +255,34 @@ function refreshWeb(refreshType) {
                 content[0] += '</div>';
                 content[0] += '<div class="modal-body">';
                 //content[0] += '<img class="currentLayout" src="css/images/layout' + layoutName + '.png" alt="currentLayout"/>';
-                content[0] += '<ul class="layoutMenu">';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="1" value="1x1"' + isDisabled1 + '><img src="css/images/layout1x1.png" alt="1x1"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="16" value="1x2"' + isDisabled16 + '><img src="css/images/layout1x2.png" alt="1x2"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="2" value="2x2"' + isDisabled2 + '><img src="css/images/layout2x2.png" alt="2x2"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="8" value="3x2"' + isDisabled8 + '><img src="css/images/layout3x2.png" alt="3x2"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="53" value="4x2"' + isDisabled53 + '><img src="css/images/layout4x2.png" alt="4x2"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="3" value="3x3"' + isDisabled3 + '><img src="css/images/layout3x3.png" alt="3x3"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="9" value="4x3"' + isDisabled9 + '><img src="css/images/layout4x3.png" alt="4x3"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="4" value="4x4"' + isDisabled4 + '><img src="css/images/layout4x4.png" alt="4x4"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4"/></button></li>';
-                content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="25" value="25"' + isDisabled25 + '><img src="css/images/layout25.png" alt="25"/></button></li>';
-				content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="27" value="27"' + isDisabled27 + '><img src="css/images/layout27.png" alt="27"/></button></li>';
-				content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="28" value="28"' + isDisabled28 + '><img src="css/images/layout28.png" alt="28"/></button></li>';
-				content[0] += '<li><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="49" value="49"' + isDisabled49 + '><img src="css/images/layout49.png" alt="49"/></button></li>';
-                content[0] += '</ul>';
-                content[0] += '<form id="panePlacement' + conferenceArrayInnerValue.uniqueId + '">';
+                content[0] += '<div class="layoutMenu">';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="1" value="1x1"' + isDisabled1 + '><img src="css/images/layout1x1.png" alt="1x1"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="16" value="1x2"' + isDisabled16 + '><img src="css/images/layout1x2.png" alt="1x2"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="2" value="2x2"' + isDisabled2 + '><img src="css/images/layout2x2.png" alt="2x2"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="8" value="3x2"' + isDisabled8 + '><img src="css/images/layout3x2.png" alt="3x2"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="53" value="4x2"' + isDisabled53 + '><img src="css/images/layout4x2.png" alt="4x2"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="3" value="3x3"' + isDisabled3 + '><img src="css/images/layout3x3.png" alt="3x3"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="9" value="4x3"' + isDisabled9 + '><img src="css/images/layout4x3.png" alt="4x3"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="4" value="4x4"' + isDisabled4 + '><img src="css/images/layout4x4.png" alt="4x4"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="43" value="5x4"' + isDisabled43 + '><img src="css/images/layout5x4.png" alt="5x4"/></button></div>';
+                content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="25" value="25"' + isDisabled25 + '><img src="css/images/layout25.png" alt="25"/></button></div>';
+				content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="27" value="27"' + isDisabled27 + '><img src="css/images/layout27.png" alt="27"/></button></div>';
+				content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="28" value="28"' + isDisabled28 + '><img src="css/images/layout28.png" alt="28"/></button></div>';
+				content[0] += '<div><button class="layout" data-conf="' + currentConference + '" type="button" data-layout="49" value="49"' + isDisabled49 + '><img src="css/images/layout49.png" alt="49"/></button></div>';
+                content[0] += '</div>';
+                content[0] += '<form id="panePlacement' + conferenceArrayInnerValue.uniqueId + '" class="panePlacementForm">';
 
-                //post this information to refresher.php to take action
-
+				//content[0] += '<table id="paneTable" class="tableStyle">';
+								
                 paneNumber = 0;
 
                 //loop through each pane in the conference array
                 $.each(conferenceArrayInnerValue.panes, function (panesArrayInnerKey, panesArrayInnerValue) {
                     paneLabelNumber = paneNumber + 1;
+					//if (paneNumber % 3 === 0 || paneNumber === 0) {
+					//	content[0] += '<tr>';
+					//}
+					//content[0] += '<td>';
                     content[0] += '<div class="paneDiv" id="pane' + paneNumber + 'Div">';
                     content[0] += '<label for="pane' + paneNumber + 'Label">Pane ' + paneLabelNumber + '</label>';
                     content[0] += '<select name="pane' + paneNumber + 'Select" class="paneSelect" id="select' + conferenceArrayInnerValue.uniqueId + paneNumber + '">';
@@ -422,9 +426,16 @@ function refreshWeb(refreshType) {
                     }
                     content[0] += '</select>';
                     content[0] += '</div>';
+					//content[0] += '</td>';
+					//if (paneLabelNumber % 3 === 0) {
+					//	content[0] += '</tr>';
+					//}
                     paneNumber = paneNumber + 1;
                 });
-
+				//if (paneLabelNumber % 3 !== 0) {
+				//		content[0] += '</tr>';
+				//}
+				//content[0] += '</table>';
                 content[0] += '</form>';
                 content[0] += '<div style="clear:both"></div>';
                 content[0] += '</div>';

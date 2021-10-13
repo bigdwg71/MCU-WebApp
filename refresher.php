@@ -22,24 +22,28 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 	
     if ($_POST['type'] == 'first') {
         writeConferenceEnumerate($mcuUsername, $mcuPassword);
+		apc_store('writeConferenceTimer',microtime(true));
         writeParticipantEnumerate($mcuUsername, $mcuPassword);
+		apc_store('writeParticipantTimer',microtime(true));
         writePanesDB($mcuUsername, $mcuPassword, $conferenceArray);
+		apc_store('writePanesDBTimer',microtime(true));
     }
     refreshWeb($mcuUsername, $mcuPassword);
 } elseif (isset($_POST['action']) && $_POST['action'] == 'writeParticipantEnumerate') {
-	
+	//error_log("MillaTime Before: " . round(microtime(true),3)*1000);
 	$lastWriteParticipant = apc_fetch('writeParticipantTimer',$success);
-    
+	//error_log("MillaTime Last: " . round($lastWriteParticipant,3)*1000);
+    //error_log("MillaTime After: " . round(microtime(true),3)*1000);
 	$timeDifference = round(microtime(true) - $lastWriteParticipant,3)*1000;
 	
-	if ($success && $timeDifference < round($writeParticipantTimer*0.75)) {
+	if ($success && $timeDifference < round($writeParticipantTimer)) {
 		//error_log("Skipping Write Participants. Time Difference: " . $timeDifference);
-		//error_log("Write Participants. Timer: " . round($writeParticipantTimer*0.75));
+		//error_log("Write Participants. Timer: " . round($writeParticipantTimer));
 	} else {
-		writeParticipantEnumerate($mcuUsername, $mcuPassword);
 		apc_store('writeParticipantTimer',microtime(true));
+		writeParticipantEnumerate($mcuUsername, $mcuPassword);
 		//error_log("Doing Write Participants. Time Difference: " . $timeDifference);
-		//error_log("Write Participants. Timer: " . round($writeParticipantTimer*0.75));
+		//error_log("Write Participants. Timer: " . round($writeParticipantTimer));
 	}
 	
 } elseif (isset($_POST['action']) && $_POST['action'] == 'writeConferenceEnumerate') {
@@ -47,14 +51,14 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 	$lastWriteConferences = apc_fetch('writeConferenceTimer',$success);
 	$timeDifference = round(microtime(true) - $lastWriteConferences,3)*1000;
 	
-	if ($success && $timeDifference < round($writeConferenceTimer*0.75)) {
+	if ($success && $timeDifference < round($writeConferenceTimer)) {
 		//error_log("Skipping Write Conferences. Time Difference: " . $timeDifference);
-		//error_log("Write Conferences. Timer: " . round($writeConferenceTimer*0.75));
+		//error_log("Write Conferences. Timer: " . round($writeConferenceTimer));
 	} else {
-		writeConferenceEnumerate($mcuUsername, $mcuPassword);
 		apc_store('writeConferenceTimer',microtime(true));
+		writeConferenceEnumerate($mcuUsername, $mcuPassword);
 		//error_log("Doing Write Conferences. Time Difference: " . $timeDifference);
-		//error_log("Write Conferences. Timer: " . round($writeConferenceTimer*0.75));
+		//error_log("Write Conferences. Timer: " . round($writeConferenceTimer));
 	}
 	
 } elseif (isset($_POST['action']) && $_POST['action'] == 'writePanesDB') {
@@ -63,14 +67,14 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 	$lastPanesDB = apc_fetch('writePanesDBTimer',$success);
 	$timeDifference = round(microtime(true) - $lastPanesDB,3)*1000;
 	
-	if ($success && $timeDifference < round($writePanesDBTimer*0.6)) {
+	if ($success && $timeDifference < round($writePanesDBTimer)) {
 		//error_log("Skipping Write Panes DB. Time Difference: " . $timeDifference);
-		//error_log("Write Panes DB. Timer: " . round($writePanesDBTimer*0.6));
+		//error_log("Write Panes DB. Timer: " . round($writePanesDBTimer));
 	} else {
-		writePanesDB($mcuUsername, $mcuPassword, $conferenceArray);
 		apc_store('writePanesDBTimer',microtime(true));
+		writePanesDB($mcuUsername, $mcuPassword, $conferenceArray);
 		//error_log("Doing Write Panes. Time Difference: " . $timeDifference);
-		//error_log("Write Panes DB. Timer: " . round($writePanesDBTimer*0.6));
+		//error_log("Write Panes DB. Timer: " . round($writePanesDBTimer));
 	}
 	
 } elseif (isset($_POST['action']) && $_POST['action'] == 'transfer') {
@@ -85,20 +89,37 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
     $participantList = $_POST['scrubbedParticipantList'];
 
     //get the conference IDs to allow for pane and participant queries
-    $sourceConferenceInfo = databaseQuery('conferenceInfo', $sourceConferenceName);
-    $sourceConferenceTableId = $sourceConferenceInfo['id'];
-
     $destConferenceInfo = databaseQuery('conferenceInfo', $destConferenceName);
     $destConferenceTableId = $destConferenceInfo['id'];
 	
+	$sourceConferenceInfo = databaseQuery('conferenceInfo', $sourceConferenceName);
+    $sourceConferenceTableId = $sourceConferenceInfo['id'];
+	
+	//fetch codec information
 	$codec = databaseQuery('codecInfo', $destConferenceName);
-
+	
+	//check if the conferences are set to auto-expand
+	$destConfAutoExpand = filter_var($destConferenceInfo['autoExpand'], FILTER_VALIDATE_BOOLEAN);
+	$sourceConfAutoExpand = filter_var($sourceConferenceInfo['autoExpand'], FILTER_VALIDATE_BOOLEAN);
+	
+	//if they are set to auto-expand then change their type to auto
+	if ($destConfAutoExpand === true && $destType !== "waiting") {
+		$destType = "auto";
+	}
+	//if they are set to auto-expand then change their type to auto
+	if ($sourceConfAutoExpand === true && $sourceType !== "waiting") {
+		$sourceType = "auto";
+	}
+	
+	//error_log("Dest Type: " . $destType);
+	//error_log("Source Type: " . $sourceType);
+	
     //Get particpant info of the existing loop in the conference for use later in the function
     $findLoop['conferenceTableId'] = $sourceConferenceTableId;
     $conferenceLoop = databaseQuery('findConferenceLoop', $findLoop);
 
     //If there is no loop in the conference, then add one here
-    if ($conferenceLoop['participantName'] == "" && $sourceType != "waiting") {
+    if ($conferenceLoop['participantName'] == "" && $sourceType !== "waiting" && count($codec) != 0) {
 
         //Add loop to grid conference
         $addNewLoop = mcuCommand(
@@ -199,7 +220,9 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 
             //Check if the participant has an existing DB entry so we can put them back in the proper pane
             $currentPaneResult = databaseQuery('panePlacementUpdate', $currentPane);
-
+			
+			$participantPaneTarget = 0;
+			
             //If we receive a result from the DB, then set it as the target pane
             if ($currentPaneResult !== 0) {
                 $participantPaneTarget = $currentPaneResult;
@@ -210,7 +233,9 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                 $unsetLoop['conferenceTableId'] = $destConferenceTableId;
                 $unsetLoopResult = databaseQuery('panePlacementUpdate', $unsetLoop);
 
-            } else {
+            } 
+			//For now, we are disabling the auto-assignment of panes when moving into a grid
+			/*else {
                 //If there is no pane placement entry for the participant
                 //in the destination conference, we will find the first available pane and use it
                 $findAvailablePane['action'] = "findAvailablePane";
@@ -227,7 +252,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                     $addPaneEntry['participantTableId'] = $participantTableId;
                     $addPaneEntryResult = databaseQuery('panePlacementUpdate', $addPaneEntry);
                 }
-            }
+            }*/
 
             //move participant
             $checkMove = mcuCommand(
@@ -241,7 +266,8 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                       'participantType' => $participantType,
                       'newConferenceName' => $destConferenceName)
             );
-
+			
+			//For now, we are disabling the auto-assignment of panes when moving into a grid
             //Now set the correct pane for the participant
             if ($participantPaneTarget > 0 && $participantPaneTarget <= 20) {
                 //Set participant to the appropriate pane
@@ -387,7 +413,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                       'cpLayout' => 'conferenceCustom',
                       'focusType' => 'voiceActivated')
             );
-        } elseif ($destType == "eyeline") {
+        } else {
             //move participant
             $checkMove = mcuCommand(
                 array('prefix' => 'participant.'),
@@ -816,6 +842,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 			
             $confLayout = $conf['customLayout'];
             $conferenceName = $conf['conferenceName'];
+			$waitingRoom = databaseQuery('readSetting', 'waitingRoom');
 
             if (!$codecDN) {
 				//error_log("No Codec DN? Skipping Codec and Loop.");
@@ -825,15 +852,13 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 				//error_log("Codec DN: " . json_encode($codecDN));
                 //check to see if a codec or loop are already present in the current conference
                 foreach ($participantList as $part) {
-                    if ($part['conferenceName'] == $conferenceName &&
-                        $part['displayName'] == "__") {
+                    if ($part['conferenceName'] == $conferenceName && $part['displayName'] == "__") {
 
                         $addCodec = false;
 
                         continue;
 
-                    } elseif ($part['conferenceName'] == $conferenceName &&
-                        $part['displayName'] == "_") {
+                    } elseif ($part['conferenceName'] == $conferenceName && $part['displayName'] == "_") {
 
                         $addLoop = false;
                         continue;
@@ -910,8 +935,6 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
                           'cpLayout' => 'conferenceCustom')
                 );
 
-                $waitingRoom = databaseQuery('readSetting', 'waitingRoom');
-
                 if ($conf['conferenceName'] == $waitingRoom) {
 
                     //Set the layout of the codec in the waitingRoom
@@ -952,7 +975,7 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 				$pane = 1;
 				$codecFound = databaseQuery('codecInfo', $conferenceName);
 				
-				if (isset($codecFound['participantName'])){
+				if (isset($codecFound['participantName']) && ($confLayout == 25 || $confLayout == 27)){
 					$setCodecPane = mcuCommand(
 					array('prefix' => 'conference.paneplacement.'),
 					'modify',
@@ -971,6 +994,9 @@ if (isset($_POST['action']) && $_POST['action'] == '') {
 			
 
             //Add Loop
+			//error_log("addLoop: " . json_encode($addLoop));
+			//error_log("Conference : " . json_encode($conf['conferenceName']));
+			//error_log("Waiting Room : " . json_encode($waitingRoom));
             if ($addLoop == true && $conf['conferenceName'] != $waitingRoom) {
 
                 $resultLoop = mcuCommand(
